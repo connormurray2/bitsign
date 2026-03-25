@@ -31,7 +31,7 @@ export async function GET(
     const isAuthorized =
       callerKey &&
       (document.creatorKey === callerKey ||
-        document.signers.some((s) => s.identityKey === callerKey))
+        document.signers.some((s: { identityKey: string }) => s.identityKey === callerKey))
 
     if (isAuthorized) {
       downloadUrl = await getDownloadPresignedUrl(document.s3Key)
