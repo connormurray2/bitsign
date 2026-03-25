@@ -23,6 +23,7 @@ export interface CreatorSigningEventInput {
   ownerPubkey: string
   timestamp: string
   lockingScriptHex: string
+  rawTxHex?: string
 }
 export interface CreateDocumentRequest {
   title: string
@@ -51,6 +52,7 @@ export interface SignRequest {
   ownerPubkey: string
   timestamp: string
   lockingScriptHex: string
+  rawTxHex?: string
 }
 export interface SignResponse {
   signingEvent: SigningEventData

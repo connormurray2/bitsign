@@ -133,6 +133,7 @@ export default function NewDocumentPage() {
             ownerPubkey: broadcastResult.ownerPubkey,
             timestamp: broadcastResult.timestamp,
             lockingScriptHex: broadcastResult.lockingScriptHex,
+            rawTxHex: broadcastResult.rawTxHex,
           },
         }),
       })

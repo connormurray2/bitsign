@@ -24,6 +24,7 @@ const schema = z.object({
     ownerPubkey: z.string().min(66).max(130),
     timestamp: z.string().datetime(),
     lockingScriptHex: z.string().min(1),
+    rawTxHex: z.string().optional(),
   }),
 })
 
@@ -38,9 +39,7 @@ export async function POST(req: NextRequest) {
     const { title, s3Key, sha256, creatorIdentityKey, signers, creatorSigningEvent } = parsed.data
 
     // Verify the creator's signing transaction on-chain
-    console.log('[documents] txid to verify:', creatorSigningEvent.txid)
-    const verification = await verifySigningTx(creatorSigningEvent.txid)
-    console.log('[documents] verification result:', JSON.stringify(verification))
+    const verification = await verifySigningTx(creatorSigningEvent.txid, creatorSigningEvent.rawTxHex)
     if (!verification.valid || !verification.signatureValid) {
       return NextResponse.json(
         { error: 'Creator signing transaction verification failed', detail: verification.error },

@@ -1,5 +1,6 @@
 'use client'
 
+import { Transaction } from '@bsv/sdk'
 import { getWalletClient } from '../wallet/cwi'
 import { buildBitSignScript } from './pushdrop'
 import { PUSH_DROP_BASKET } from '../utils/constants'
@@ -10,6 +11,7 @@ export interface BroadcastResult {
   ownerPubkey: string
   timestamp: string
   lockingScriptHex: string
+  rawTxHex?: string
 }
 
 /**
@@ -53,11 +55,21 @@ export async function signAndBroadcastDocument(
 
   if (!result.txid) throw new Error('Wallet did not return a txid — transaction may be pending signature')
 
+  let rawTxHex: string | undefined
+  if (result.tx) {
+    try {
+      rawTxHex = Transaction.fromAtomicBEEF(result.tx as number[]).toHex()
+    } catch {
+      // BEEF parse failed — server will fall back to WoC
+    }
+  }
+
   return {
     txid: result.txid,
     outputIndex: 0,
     ownerPubkey,
     timestamp,
     lockingScriptHex,
+    rawTxHex,
   }
 }
