@@ -5,10 +5,10 @@ import { useParams } from 'next/navigation'
 import { useWallet } from '@/hooks/useWallet'
 import { PDFViewer } from '@/components/documents/PDFViewer'
 import { SignButton } from '@/components/signing/SignButton'
-import { BSV_EXPLORER_TX_URL } from '@/lib/utils/constants'
 import type { BroadcastResult } from '@/lib/bsv/broadcast'
 import type { GetDocumentResponse } from '@/types/api'
 import type { PartialSig } from '@/lib/bsv/multisig'
+import { TxLink } from '@/components/blockchain/TxLink'
 
 export default function SignPage() {
   const params = useParams<{ token: string }>()
@@ -229,22 +229,12 @@ export default function SignPage() {
 
       {/* ── Multisig complete (last signer broadcast) ───────────────────────── */}
       {broadcastTxid && (
-        <div className="p-5 bg-green-50 border border-green-300 rounded-xl space-y-2">
+        <div className="p-5 bg-green-50 border border-green-300 rounded-xl space-y-3">
           <p className="font-bold text-green-800 text-lg">Document fully signed.</p>
           <p className="text-sm text-green-700">
             All {totalSigners} signatures have been recorded on the BSV blockchain.
           </p>
-          <p className="text-sm text-green-700">
-            TXID:{' '}
-            <a
-              href={`${BSV_EXPLORER_TX_URL}/${broadcastTxid}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono hover:underline"
-            >
-              {broadcastTxid}
-            </a>
-          </p>
+          <TxLink txid={broadcastTxid} variant="full" />
         </div>
       )}
 
@@ -269,22 +259,10 @@ export default function SignPage() {
 
       {/* ── Single-sig complete ─────────────────────────────────────────────── */}
       {signResult && (
-        <div className="p-5 bg-green-50 border border-green-300 rounded-xl space-y-2">
+        <div className="p-5 bg-green-50 border border-green-300 rounded-xl space-y-3">
           <p className="font-bold text-green-800 text-lg">Document signed successfully.</p>
-          <p className="text-sm text-green-700">
-            Your signature has been recorded on the BSV blockchain.
-          </p>
-          <p className="text-sm text-green-700">
-            TXID:{' '}
-            <a
-              href={`${BSV_EXPLORER_TX_URL}/${signResult.txid}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono hover:underline"
-            >
-              {signResult.txid}
-            </a>
-          </p>
+          <p className="text-sm text-green-700">Your signature has been recorded on the BSV blockchain.</p>
+          <TxLink txid={signResult.txid} variant="full" />
         </div>
       )}
 

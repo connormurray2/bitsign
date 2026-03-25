@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import type { DocumentData } from '@/types/document'
-import { BSV_EXPLORER_TX_URL } from '@/lib/utils/constants'
+import { TxLink } from '@/components/blockchain/TxLink'
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-700',
@@ -55,15 +55,7 @@ export function DocumentCard({ document, variant, mySignerToken }: Props) {
           {signedCount}/{totalCount} signed
         </span>
         {document.status === 'COMPLETE' && document.signingEvents[0] && (
-          <a
-            href={`${BSV_EXPLORER_TX_URL}/${document.signingEvents[0].txid}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-500 hover:underline truncate max-w-xs"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {document.signingEvents[0].txid.slice(0, 12)}...
-          </a>
+          <TxLink txid={document.signingEvents[0].txid} variant="badge" label="On-chain" />
         )}
       </div>
     </Link>

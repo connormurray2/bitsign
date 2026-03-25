@@ -8,7 +8,7 @@ import { useDocument } from '@/hooks/useDocument'
 import { PDFViewer } from '@/components/documents/PDFViewer'
 import { SigningTimeline } from '@/components/documents/SigningTimeline'
 import { SignButton } from '@/components/signing/SignButton'
-import { BSV_EXPLORER_TX_URL } from '@/lib/utils/constants'
+import { TxLink } from '@/components/blockchain/TxLink'
 import type { BroadcastResult } from '@/lib/bsv/broadcast'
 import type { SignerData } from '@/types/document'
 
@@ -147,19 +147,9 @@ export default function DocumentPage() {
 
           {/* Just signed confirmation */}
           {justSigned && (
-            <div className="p-4 bg-green-50 border border-green-300 rounded-xl text-sm space-y-1">
-              <p className="font-semibold text-green-800">You signed this document.</p>
-              <p className="text-green-700">
-                TXID:{' '}
-                <a
-                  href={`${BSV_EXPLORER_TX_URL}/${justSigned.txid}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono hover:underline"
-                >
-                  {justSigned.txid.slice(0, 20)}...
-                </a>
-              </p>
+            <div className="p-4 bg-green-50 border border-green-300 rounded-xl space-y-2">
+              <p className="font-semibold text-green-800">Signature recorded on the BSV blockchain.</p>
+              <TxLink txid={justSigned.txid} variant="full" />
             </div>
           )}
 
@@ -204,10 +194,39 @@ export default function DocumentPage() {
           </div>
 
           {/* Document hash */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <h2 className="font-semibold text-gray-800 mb-2 text-sm">Document Hash (SHA-256)</h2>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
+            <h2 className="font-semibold text-gray-800 text-sm">Document Hash (SHA-256)</h2>
             <p className="font-mono text-xs text-gray-500 break-all">{document.sha256}</p>
           </div>
+
+          {/* Blockchain records */}
+          {document.signingEvents.length > 0 && (() => {
+            // Deduplicate by TXID (multisig: all signers share one TX)
+            const seen = new Set<string>()
+            const unique = document.signingEvents.filter((ev) => {
+              if (seen.has(ev.txid)) return false
+              seen.add(ev.txid)
+              return true
+            })
+            return (
+              <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                <h2 className="font-semibold text-gray-800 text-sm">Blockchain Records</h2>
+                <div className="space-y-3">
+                  {unique.map((ev) => {
+                    const signers = document.signers.filter((s) => s.signingEvent?.txid === ev.txid)
+                    const names = signers.map((s) => s.handle ?? `${s.identityKey.slice(0, 8)}…`).join(', ')
+                    return (
+                      <div key={ev.txid} className="space-y-1.5 pb-3 border-b border-gray-100 last:border-0 last:pb-0">
+                        <p className="text-xs font-medium text-gray-700">{names || `${ev.identityKey.slice(0, 10)}…`}</p>
+                        <p className="text-xs text-gray-400">{new Date(ev.timestamp).toLocaleString()}</p>
+                        <TxLink txid={ev.txid} variant="badge" />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Share links — only show to creator, only for pending signers */}
           {identityKey === document.creatorKey && document.status === 'PENDING' && (
