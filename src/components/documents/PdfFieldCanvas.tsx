@@ -244,10 +244,156 @@ export default function PdfFieldCanvas({ file, signers, fields, onFieldsChange }
     return FIELD_COLORS[index % FIELD_COLORS.length]
   }
 
+  // Get selected signer display name
+  const getSelectedSignerName = () => {
+    const signer = signers.find(s => s.identityKey === selectedSignerKey)
+    if (!signer) return 'Select signer'
+    if (signer.handle) return signer.handle
+    if (signer.order === 1) return 'You'
+    return signer.identityKey.slice(0, 8) + '...'
+  }
+
+  // Mobile: compact floating toolbar
+  if (isMobile) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* Compact toolbar at top */}
+        <div className="bg-white border-b border-gray-200 p-3 space-y-3">
+          {/* Row 1: Signer selector + field count */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">For:</span>
+            <div className="flex gap-1 flex-1 overflow-x-auto">
+              {signers.map((signer) => (
+                <button
+                  key={signer.identityKey}
+                  onClick={() => setSelectedSignerKey(signer.identityKey)}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                    selectedSignerKey === signer.identityKey
+                      ? 'text-white'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                  style={{
+                    backgroundColor: selectedSignerKey === signer.identityKey 
+                      ? getSignerColor(signer.identityKey) 
+                      : undefined,
+                  }}
+                >
+                  <span className="w-4 h-4 rounded-full bg-white/30 flex items-center justify-center text-[10px]">
+                    {signer.order}
+                  </span>
+                  {signer.handle || (signer.order === 1 ? 'You' : signer.identityKey.slice(0, 6))}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-gray-400">{fields.length} fields</span>
+          </div>
+          
+          {/* Row 2: Field type buttons */}
+          <div className="flex gap-2">
+            {(['signature', 'initials', 'date', 'text'] as FieldType[]).map((type) => (
+              <button
+                key={type}
+                onClick={() => setActiveFieldType(activeFieldType === type ? null : type)}
+                className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  activeFieldType === type
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                <span>{FIELD_ICONS[type]}</span>
+                <span className="hidden xs:inline">{FIELD_LABELS[type]}</span>
+              </button>
+            ))}
+          </div>
+          
+          {activeFieldType && (
+            <p className="text-xs text-blue-600 text-center">
+              Tap on PDF to place {FIELD_LABELS[activeFieldType]}
+            </p>
+          )}
+        </div>
+
+        {/* PDF viewer takes remaining space */}
+        <div className="flex-1 bg-gray-100 overflow-hidden flex flex-col" ref={containerRef}>
+          {/* Page controls */}
+          <div className="bg-white border-b border-gray-200 px-3 py-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-2 py-1 bg-gray-100 rounded text-xs font-medium disabled:opacity-40"
+              >
+                ←
+              </button>
+              <span className="text-xs text-gray-600">
+                {currentPage}/{numPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
+                disabled={currentPage === numPages}
+                className="px-2 py-1 bg-gray-100 rounded text-xs font-medium disabled:opacity-40"
+              >
+                →
+              </button>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setScale((s) => Math.max(0.5, s - 0.25))}
+                className="px-2 py-1 bg-gray-100 rounded text-xs font-medium"
+              >
+                −
+              </button>
+              <span className="text-xs text-gray-600 w-10 text-center">{Math.round(scale * 100)}%</span>
+              <button
+                onClick={() => setScale((s) => Math.min(3, s + 0.25))}
+                className="px-2 py-1 bg-gray-100 rounded text-xs font-medium"
+              >
+                +
+              </button>
+            </div>
+            {selectedField && (
+              <button
+                onClick={handleDeleteField}
+                className="px-2 py-1 bg-red-100 text-red-600 rounded text-xs font-medium"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+
+          {/* PDF canvas - scrollable */}
+          <div className="flex-1 overflow-auto p-2">
+            {loading && (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-sm">Loading PDF...</p>
+              </div>
+            )}
+            {pdfError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                <p className="text-red-700 font-medium mb-1">Failed to load PDF</p>
+                <p className="text-red-600 text-sm">{pdfError}</p>
+              </div>
+            )}
+            {!loading && !pdfError && (
+              <canvas
+                ref={canvasRef}
+                onClick={handleCanvasClick}
+                className="shadow-lg mx-auto"
+                style={{ maxWidth: '100%', height: 'auto' }}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Desktop layout
   return (
-    <div className={`${isMobile ? 'flex flex-col' : 'flex'} gap-4 h-full`}>
+    <div className="flex gap-4 h-full">
       {/* Sidebar */}
-      <div className={`${isMobile ? 'w-full' : 'w-64'} flex-shrink-0 space-y-4`}>
+      <div className="w-64 flex-shrink-0 space-y-4">
         {/* Signer selector */}
         <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
           <label className="block text-sm font-semibold text-gray-700">Assign fields to:</label>
@@ -294,38 +440,21 @@ export default function PdfFieldCanvas({ file, signers, fields, onFieldsChange }
 
         {/* Field palette */}
         <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
-          <label className="block text-sm font-semibold text-gray-700 mb-3">
-            {isMobile ? 'Tap field, then tap PDF:' : 'Drag fields onto PDF:'}
-          </label>
+          <label className="block text-sm font-semibold text-gray-700 mb-3">Drag fields onto PDF:</label>
           <div className="space-y-2">
             {(['signature', 'initials', 'date', 'text'] as FieldType[]).map((type) => (
               <div
                 key={type}
-                draggable={!isMobile}
-                onDragStart={() => !isMobile && setDraggingField(type)}
-                onDragEnd={() => !isMobile && setDraggingField(null)}
-                onClick={() => isMobile && setActiveFieldType(activeFieldType === type ? null : type)}
-                className={`flex items-center gap-2 px-3 py-2.5 border rounded-lg transition-colors ${
-                  isMobile ? 'cursor-pointer' : 'cursor-move'
-                } ${
-                  activeFieldType === type
-                    ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-200'
-                    : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
-                }`}
+                draggable
+                onDragStart={() => setDraggingField(type)}
+                onDragEnd={() => setDraggingField(null)}
+                className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg cursor-move hover:bg-gray-100 hover:border-gray-300 transition-colors"
               >
                 <span className="text-lg">{FIELD_ICONS[type]}</span>
                 <span className="text-sm font-medium text-gray-700">{FIELD_LABELS[type]}</span>
-                {isMobile && activeFieldType === type && (
-                  <span className="ml-auto text-xs text-blue-600 font-medium">Selected</span>
-                )}
               </div>
             ))}
           </div>
-          {isMobile && activeFieldType && (
-            <p className="text-xs text-blue-600 mt-2">
-              Tap anywhere on the PDF to place a {FIELD_LABELS[activeFieldType]} field
-            </p>
-          )}
         </div>
 
         {/* Delete button */}
