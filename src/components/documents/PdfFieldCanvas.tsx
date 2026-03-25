@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import { isMobileDevice } from '@/lib/wallet/cwi'
 
-// Configure PDF.js worker
+// Configure PDF.js worker - use local copy for WebView compatibility (BSV Browser)
+// CDN workers are blocked in some WebViews, so we serve it from /public
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 }
 
 export type FieldType = 'signature' | 'initials' | 'date' | 'text'
