@@ -4,11 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import { isMobileDevice } from '@/lib/wallet/cwi'
 
-// Disable PDF.js worker for WebView compatibility (BSV Browser)
-// Workers are problematic in WebViews - run on main thread instead
-// This is slower but works everywhere
+// Configure PDF.js worker - use local copy for WebView compatibility (BSV Browser)
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+  // Use .js extension for broader compatibility (some WebViews don't like .mjs)
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
 }
 
 export type FieldType = 'signature' | 'initials' | 'date' | 'text'
