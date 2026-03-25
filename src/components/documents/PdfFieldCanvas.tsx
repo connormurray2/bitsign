@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
+import { isMobileDevice } from '@/lib/wallet/cwi'
 
 // Configure PDF.js worker
 if (typeof window !== 'undefined') {
@@ -60,6 +61,13 @@ export default function PdfFieldCanvas({ file, signers, fields, onFieldsChange }
   const [draggingField, setDraggingField] = useState<FieldType | null>(null)
   const [selectedField, setSelectedField] = useState<string | null>(null)
   const [selectedSignerKey, setSelectedSignerKey] = useState<string>('')
+  const [isMobile, setIsMobile] = useState(false)
+  const [activeFieldType, setActiveFieldType] = useState<FieldType | null>(null) // For tap-to-place on mobile
+
+  // Detect mobile on mount
+  useEffect(() => {
+    setIsMobile(isMobileDevice())
+  }, [])
 
   // Load PDF
   useEffect(() => {
@@ -150,6 +158,21 @@ export default function PdfFieldCanvas({ file, signers, fields, onFieldsChange }
 
     if (clickedField) {
       setSelectedField(clickedField.id)
+      setActiveFieldType(null) // Deselect field type when selecting existing field
+    } else if (isMobile && activeFieldType && selectedSignerKey) {
+      // Mobile tap-to-place: if a field type is selected, place it here
+      const newField: SigningField = {
+        id: `field-${Date.now()}-${Math.random()}`,
+        type: activeFieldType,
+        page: currentPage,
+        x: Math.max(0, Math.min(85, x - 7.5)),
+        y: Math.max(0, Math.min(92, y - 4)),
+        width: activeFieldType === 'signature' ? 25 : activeFieldType === 'initials' ? 12 : 18,
+        height: 8,
+        assignedSignerKey: selectedSignerKey,
+      }
+      onFieldsChange([...fields, newField])
+      // Keep field type selected for placing multiple of same type
     } else {
       setSelectedField(null)
     }
@@ -190,9 +213,9 @@ export default function PdfFieldCanvas({ file, signers, fields, onFieldsChange }
   }
 
   return (
-    <div className="flex gap-4 h-full">
+    <div className={`${isMobile ? 'flex flex-col' : 'flex'} gap-4 h-full`}>
       {/* Sidebar */}
-      <div className="w-64 flex-shrink-0 space-y-4">
+      <div className={`${isMobile ? 'w-full' : 'w-64'} flex-shrink-0 space-y-4`}>
         {/* Signer selector */}
         <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
           <label className="block text-sm font-semibold text-gray-700">Assign fields to:</label>
@@ -239,21 +262,38 @@ export default function PdfFieldCanvas({ file, signers, fields, onFieldsChange }
 
         {/* Field palette */}
         <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
-          <label className="block text-sm font-semibold text-gray-700 mb-3">Drag fields onto PDF:</label>
+          <label className="block text-sm font-semibold text-gray-700 mb-3">
+            {isMobile ? 'Tap field, then tap PDF:' : 'Drag fields onto PDF:'}
+          </label>
           <div className="space-y-2">
             {(['signature', 'initials', 'date', 'text'] as FieldType[]).map((type) => (
               <div
                 key={type}
-                draggable
-                onDragStart={() => setDraggingField(type)}
-                onDragEnd={() => setDraggingField(null)}
-                className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg cursor-move hover:bg-gray-100 hover:border-gray-300 transition-colors"
+                draggable={!isMobile}
+                onDragStart={() => !isMobile && setDraggingField(type)}
+                onDragEnd={() => !isMobile && setDraggingField(null)}
+                onClick={() => isMobile && setActiveFieldType(activeFieldType === type ? null : type)}
+                className={`flex items-center gap-2 px-3 py-2.5 border rounded-lg transition-colors ${
+                  isMobile ? 'cursor-pointer' : 'cursor-move'
+                } ${
+                  activeFieldType === type
+                    ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-200'
+                    : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
+                }`}
               >
                 <span className="text-lg">{FIELD_ICONS[type]}</span>
                 <span className="text-sm font-medium text-gray-700">{FIELD_LABELS[type]}</span>
+                {isMobile && activeFieldType === type && (
+                  <span className="ml-auto text-xs text-blue-600 font-medium">Selected</span>
+                )}
               </div>
             ))}
           </div>
+          {isMobile && activeFieldType && (
+            <p className="text-xs text-blue-600 mt-2">
+              Tap anywhere on the PDF to place a {FIELD_LABELS[activeFieldType]} field
+            </p>
+          )}
         </div>
 
         {/* Delete button */}
