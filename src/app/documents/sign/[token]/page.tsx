@@ -33,7 +33,7 @@ export default function SignPage() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [signError, setSignError] = useState('')
-  const [showGuidedFlow, setShowGuidedFlow] = useState(false)
+  const [guidedFlowCompleted, setGuidedFlowCompleted] = useState(false)
   const [completedFieldValues, setCompletedFieldValues] = useState<{ fieldId: string; value: string }[]>([])
 
   // Single-sig result
@@ -326,21 +326,21 @@ export default function SignPage() {
             </div>
           )}
 
-          {/* Guided signing flow (if fields exist) */}
-          {connected && downloadUrl && showGuidedFlow && fields.length > 0 && mySigner.status !== 'SIGNED' && (
+          {/* Guided signing flow (if fields exist and not completed) */}
+          {connected && downloadUrl && fields.length > 0 && !guidedFlowCompleted && mySigner.status !== 'SIGNED' && (
             <GuidedSigningFlow
               pdfUrl={downloadUrl}
               fields={fields}
               onComplete={(fieldValues) => {
                 setCompletedFieldValues(fieldValues)
-                setShowGuidedFlow(false)
+                setGuidedFlowCompleted(true)
               }}
-              onCancel={() => setShowGuidedFlow(false)}
+              onCancel={() => setGuidedFlowCompleted(true)}
             />
           )}
 
-          {/* PDF viewer (when not in guided flow) */}
-          {connected && downloadUrl && !showGuidedFlow && (
+          {/* PDF viewer (when no fields or guided flow completed) */}
+          {connected && downloadUrl && (fields.length === 0 || guidedFlowCompleted) && (
             <PDFViewer url={downloadUrl} />
           )}
 
@@ -351,19 +351,9 @@ export default function SignPage() {
             </div>
           )}
 
-          {/* Sign buttons */}
-          {connected && mySigner.status !== 'SIGNED' && document.status === 'PENDING' && downloadUrl && !showGuidedFlow && (
+          {/* Sign buttons (only after guided flow is complete or no fields) */}
+          {connected && mySigner.status !== 'SIGNED' && document.status === 'PENDING' && downloadUrl && (fields.length === 0 || guidedFlowCompleted) && (
             <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-              {/* Start guided flow button if fields exist and not yet completed */}
-              {fields.length > 0 && completedFieldValues.length === 0 && (
-                <button
-                  onClick={() => setShowGuidedFlow(true)}
-                  className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700"
-                >
-                  Fill Required Fields ({fields.length})
-                </button>
-              )}
-
               {/* Show signing options */}
               {(fields.length === 0 || completedFieldValues.length > 0) && (
                 <>

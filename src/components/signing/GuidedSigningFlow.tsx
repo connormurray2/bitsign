@@ -6,7 +6,8 @@ import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 import { SignatureCanvas } from './SignatureCanvas'
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+// Use local worker for WebView compatibility (BSV Browser)
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
 
 interface SigningField {
   id: string
