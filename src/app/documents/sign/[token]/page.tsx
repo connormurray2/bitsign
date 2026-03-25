@@ -5,19 +5,36 @@ import { useParams } from 'next/navigation'
 import { useWallet } from '@/hooks/useWallet'
 import { PDFViewer } from '@/components/documents/PDFViewer'
 import { SignButton } from '@/components/signing/SignButton'
+import { GuidedSigningFlow } from '@/components/signing/GuidedSigningFlow'
 import type { BroadcastResult } from '@/lib/bsv/broadcast'
 import type { GetDocumentResponse } from '@/types/api'
 import type { PartialSig } from '@/lib/bsv/multisig'
 import { TxLink } from '@/components/blockchain/TxLink'
+
+interface SigningField {
+  id: string
+  type: string
+  page: number
+  x: number
+  y: number
+  width: number
+  height: number
+  assignedSignerKey: string
+  value?: string | null
+  completedAt?: string | null
+}
 
 export default function SignPage() {
   const params = useParams<{ token: string }>()
   const { connected, identityKey, connect } = useWallet()
 
   const [docData, setDocData] = useState<GetDocumentResponse | null>(null)
+  const [fields, setFields] = useState<SigningField[]>([])
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [signError, setSignError] = useState('')
+  const [showGuidedFlow, setShowGuidedFlow] = useState(false)
+  const [completedFieldValues, setCompletedFieldValues] = useState<{ fieldId: string; value: string }[]>([])
 
   // Single-sig result
   const [signResult, setSignResult] = useState<BroadcastResult | null>(null)
@@ -28,11 +45,14 @@ export default function SignPage() {
   const [broadcasting, setBroadcasting] = useState(false)
   const [broadcastTxid, setBroadcastTxid] = useState<string | null>(null)
 
-  // Resolve token to document
+  // Resolve token to document and fields
   useEffect(() => {
     fetch(`/api/sign/resolve?token=${params.token}`)
       .then((r) => r.json())
-      .then(setDocData)
+      .then((data) => {
+        setDocData({ document: data.document })
+        setFields(data.fields || [])
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [params.token])
@@ -73,6 +93,7 @@ export default function SignPage() {
         timestamp: result.timestamp,
         lockingScriptHex: result.lockingScriptHex,
         rawTxHex: result.rawTxHex,
+        fieldValues: completedFieldValues,
       }),
     })
 
@@ -95,14 +116,30 @@ export default function SignPage() {
         '@/lib/bsv/multisig'
       )
 
-      // Step 1: Create partial sig client-side
-      const { sig, pubkey } = await createPartialSig(document.sha256)
+      // Step 1: Create partial sig client-side (hash includes field values)
+      let hashToSign = document.sha256
+      if (completedFieldValues.length > 0) {
+        // Hash field values into the commitment using Web Crypto API
+        const fieldValuesString = JSON.stringify(completedFieldValues)
+        const encoder = new TextEncoder()
+        const data = encoder.encode(document.sha256 + fieldValuesString)
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+        const hashArray = Array.from(new Uint8Array(hashBuffer))
+        hashToSign = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+      }
+
+      const { sig, pubkey } = await createPartialSig(hashToSign)
 
       // Step 2: Submit to server
       const res = await fetch(`/api/documents/${document.id}/multisig`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signerToken: params.token, sig, pubkey }),
+        body: JSON.stringify({
+          signerToken: params.token,
+          sig,
+          pubkey,
+          fieldValues: completedFieldValues,
+        }),
       })
 
       if (!res.ok) {
@@ -276,52 +313,90 @@ export default function SignPage() {
             </div>
           )}
 
-          {/* PDF viewer */}
-          {downloadUrl ? (
-            <PDFViewer url={downloadUrl} />
-          ) : (
+          {/* Wallet connection prompt */}
+          {!connected && (
             <div className="border border-gray-200 rounded-xl p-8 text-center bg-white space-y-3">
-              {connected ? (
-                <p className="text-gray-400">Loading document...</p>
-              ) : (
-                <>
-                  <p className="text-gray-600">Connect your BSV wallet to view and sign this document.</p>
-                  <button
-                    onClick={connect}
-                    className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
-                  >
-                    Connect BSV Wallet
-                  </button>
-                </>
-              )}
+              <p className="text-gray-600">Connect your BSV wallet to view and sign this document.</p>
+              <button
+                onClick={connect}
+                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+              >
+                Connect BSV Wallet
+              </button>
+            </div>
+          )}
+
+          {/* Guided signing flow (if fields exist) */}
+          {connected && downloadUrl && showGuidedFlow && fields.length > 0 && mySigner.status !== 'SIGNED' && (
+            <GuidedSigningFlow
+              pdfUrl={downloadUrl}
+              fields={fields}
+              onComplete={(fieldValues) => {
+                setCompletedFieldValues(fieldValues)
+                setShowGuidedFlow(false)
+              }}
+              onCancel={() => setShowGuidedFlow(false)}
+            />
+          )}
+
+          {/* PDF viewer (when not in guided flow) */}
+          {connected && downloadUrl && !showGuidedFlow && (
+            <PDFViewer url={downloadUrl} />
+          )}
+
+          {/* Loading state */}
+          {connected && !downloadUrl && (
+            <div className="border border-gray-200 rounded-xl p-8 text-center bg-white">
+              <p className="text-gray-400">Loading document...</p>
             </div>
           )}
 
           {/* Sign buttons */}
-          {connected && mySigner.status !== 'SIGNED' && document.status === 'PENDING' && (
+          {connected && mySigner.status !== 'SIGNED' && document.status === 'PENDING' && downloadUrl && !showGuidedFlow && (
             <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-              <p className="text-sm text-gray-600">
-                {isMultisig
-                  ? 'I have reviewed the document and agree to sign it. My signature will be combined with others into a single BSV transaction.'
-                  : 'I have reviewed the document and agree to sign it electronically.'}
-              </p>
-              {signError && <p className="text-sm text-red-500">{signError}</p>}
-
-              {isMultisig ? (
+              {/* Start guided flow button if fields exist and not yet completed */}
+              {fields.length > 0 && completedFieldValues.length === 0 && (
                 <button
-                  onClick={handleMultisigSign}
-                  disabled={partialSigning}
-                  className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold disabled:opacity-50 hover:bg-blue-700 transition-colors"
+                  onClick={() => setShowGuidedFlow(true)}
+                  className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700"
                 >
-                  {partialSigning ? 'Signing...' : 'Sign Document'}
+                  Fill Required Fields ({fields.length})
                 </button>
-              ) : (
-                <SignButton
-                  docHash={document.sha256}
-                  docTitle={document.title}
-                  onSuccess={handleSingleSignSuccess}
-                  onError={(err) => setSignError(err.message)}
-                />
+              )}
+
+              {/* Show signing options */}
+              {(fields.length === 0 || completedFieldValues.length > 0) && (
+                <>
+                  <p className="text-sm text-gray-600">
+                    {isMultisig
+                      ? 'I have reviewed the document and agree to sign it. My signature will be combined with others into a single BSV transaction.'
+                      : 'I have reviewed the document and agree to sign it electronically.'}
+                  </p>
+                  {completedFieldValues.length > 0 && (
+                    <div className="text-xs text-green-700 bg-green-50 p-2 rounded">
+                      {completedFieldValues.length} field(s) completed
+                    </div>
+                  )}
+                  {signError && <p className="text-sm text-red-500">{signError}</p>}
+
+                  {isMultisig ? (
+                    <button
+                      onClick={handleMultisigSign}
+                      disabled={partialSigning}
+                      className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold disabled:opacity-50 hover:bg-blue-700 transition-colors"
+                    >
+                      {partialSigning ? 'Signing...' : 'Sign Document'}
+                    </button>
+                  ) : (
+                    <SignButton
+                      docHash={document.sha256}
+                      docTitle={document.title}
+                      onSuccess={handleSingleSignSuccess}
+                      onError={(err) => setSignError(err.message)}
+                      fieldValues={completedFieldValues}
+                    />
+                  )}
+                </>
               )}
             </div>
           )}

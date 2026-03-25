@@ -14,6 +14,10 @@ export async function GET(req: NextRequest) {
         include: {
           signers: { orderBy: { order: 'asc' }, include: { signingEvent: true } },
           signingEvents: true,
+          fields: {
+            where: { assignedSignerKey: '' },
+            orderBy: [{ page: 'asc' }, { y: 'asc' }, { x: 'asc' }],
+          },
         },
       },
     },
@@ -23,5 +27,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 404 })
   }
 
-  return NextResponse.json({ document: JSON.parse(JSON.stringify(signer.document)) })
+  // Filter fields to only include those assigned to this signer
+  const documentData = JSON.parse(JSON.stringify(signer.document))
+  const myFields = await prisma.signingField.findMany({
+    where: {
+      documentId: signer.document.id,
+      assignedSignerKey: signer.identityKey,
+    },
+    orderBy: [{ page: 'asc' }, { y: 'asc' }, { x: 'asc' }],
+  })
+
+  return NextResponse.json({
+    document: documentData,
+    fields: JSON.parse(JSON.stringify(myFields)),
+  })
 }

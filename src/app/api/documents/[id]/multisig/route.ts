@@ -7,6 +7,10 @@ const schema = z.object({
   signerToken: z.string().min(1),
   sig: z.string().min(1),    // DER hex ECDSA sig of docHash
   pubkey: z.string().min(66).max(130),
+  fieldValues: z.array(z.object({
+    fieldId: z.string(),
+    value: z.string(),
+  })).optional(),
 })
 
 function fromHex(hex: string): number[] {
@@ -29,7 +33,7 @@ export async function POST(
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
     }
 
-    const { signerToken, sig, pubkey } = parsed.data
+    const { signerToken, sig, pubkey, fieldValues } = parsed.data
 
     const signer = await prisma.signer.findUnique({
       where: { token: signerToken },
@@ -65,10 +69,26 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid signature or pubkey' }, { status: 422 })
     }
 
-    // Store partial sig and mark signer as SIGNED
-    await prisma.signer.update({
-      where: { id: signer.id },
-      data: { partialSig: sig, partialSigPubkey: pubkey, status: 'SIGNED' },
+    // Store partial sig, mark signer as SIGNED, and update field values
+    await prisma.$transaction(async (tx) => {
+      await tx.signer.update({
+        where: { id: signer.id },
+        data: { partialSig: sig, partialSigPubkey: pubkey, status: 'SIGNED' },
+      })
+
+      // Update field values if provided
+      if (fieldValues && fieldValues.length > 0) {
+        const now = new Date()
+        for (const { fieldId, value } of fieldValues) {
+          await tx.signingField.update({
+            where: { id: fieldId },
+            data: {
+              value,
+              completedAt: now,
+            },
+          })
+        }
+      }
     })
 
     // Check if all signers have now signed

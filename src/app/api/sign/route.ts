@@ -15,6 +15,10 @@ const schema = z.object({
   timestamp: z.string().datetime(),
   lockingScriptHex: z.string().min(1),
   rawTxHex: z.string().optional(),
+  fieldValues: z.array(z.object({
+    fieldId: z.string(),
+    value: z.string(),
+  })).optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -25,7 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
     }
 
-    const { documentId, signerToken, txid, outputIndex, ownerPubkey, timestamp, rawTxHex } = parsed.data
+    const { documentId, signerToken, txid, outputIndex, ownerPubkey, timestamp, rawTxHex, fieldValues } = parsed.data
 
     // Look up the signer by token
     const signer = await prisma.signer.findUnique({
@@ -90,6 +94,20 @@ export async function POST(req: NextRequest) {
         where: { id: signer.id },
         data: { status: 'SIGNED' },
       })
+
+      // Update field values if provided
+      if (fieldValues && fieldValues.length > 0) {
+        const now = new Date()
+        for (const { fieldId, value } of fieldValues) {
+          await tx.signingField.update({
+            where: { id: fieldId },
+            data: {
+              value,
+              completedAt: now,
+            },
+          })
+        }
+      }
 
       // Check if all signers have signed
       const allSigners = await tx.signer.findMany({ where: { documentId } })

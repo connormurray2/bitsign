@@ -10,9 +10,10 @@ interface Props {
   onSuccess: (result: BroadcastResult) => void
   onError?: (err: Error) => void
   disabled?: boolean
+  fieldValues?: { fieldId: string; value: string }[]
 }
 
-export function SignButton({ docHash, docTitle, onSuccess, onError, disabled }: Props) {
+export function SignButton({ docHash, docTitle, onSuccess, onError, disabled, fieldValues }: Props) {
   const [signing, setSigning] = useState(false)
   const [step, setStep] = useState('')
 
@@ -20,8 +21,19 @@ export function SignButton({ docHash, docTitle, onSuccess, onError, disabled }: 
     setSigning(true)
     setStep('Requesting signature from wallet...')
     try {
+      // If field values exist, hash them into the commitment
+      let hashToSign = docHash
+      if (fieldValues && fieldValues.length > 0) {
+        const fieldValuesString = JSON.stringify(fieldValues)
+        const encoder = new TextEncoder()
+        const data = encoder.encode(docHash + fieldValuesString)
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+        const hashArray = Array.from(new Uint8Array(hashBuffer))
+        hashToSign = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+      }
+
       setStep('Signing document hash...')
-      const result = await signAndBroadcastDocument(docHash, docTitle)
+      const result = await signAndBroadcastDocument(hashToSign, docTitle)
       setStep('Broadcasting transaction...')
       onSuccess(result)
     } catch (err) {
