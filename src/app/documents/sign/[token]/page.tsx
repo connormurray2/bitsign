@@ -59,6 +59,7 @@ export default function SignPage() {
         ownerPubkey: result.ownerPubkey,
         timestamp: result.timestamp,
         lockingScriptHex: result.lockingScriptHex,
+        rawTxHex: result.rawTxHex,
       }),
     })
 

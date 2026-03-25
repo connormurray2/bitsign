@@ -10,6 +10,49 @@ import { SigningTimeline } from '@/components/documents/SigningTimeline'
 import { SignButton } from '@/components/signing/SignButton'
 import { BSV_EXPLORER_TX_URL } from '@/lib/utils/constants'
 import type { BroadcastResult } from '@/lib/bsv/broadcast'
+import type { SignerData } from '@/types/document'
+
+function ShareLinks({ signers }: { signers: SignerData[] }) {
+  const [copied, setCopied] = useState<string | null>(null)
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
+
+  const pendingSigners = signers.filter((s) => s.status !== 'SIGNED')
+  if (pendingSigners.length === 0) return null
+
+  function copyLink(token: string) {
+    const url = `${appUrl}/documents/sign/${token}`
+    navigator.clipboard.writeText(url)
+    setCopied(token)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+      <h2 className="font-semibold text-gray-800 text-sm">Share Signing Links</h2>
+      <p className="text-xs text-gray-500">Send these links to the signers below. No wallet is needed to open the link — only to sign.</p>
+      <div className="space-y-2">
+        {pendingSigners.map((s) => (
+          <div key={s.id} className="flex items-center justify-between gap-2 p-2 bg-gray-50 rounded-lg">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-gray-700 truncate">
+                {s.handle || `Signer ${s.order}`}
+              </p>
+              <p className="text-xs text-gray-400 font-mono truncate">
+                {s.identityKey.slice(0, 16)}...
+              </p>
+            </div>
+            <button
+              onClick={() => copyLink(s.token)}
+              className="shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+            >
+              {copied === s.token ? 'Copied!' : 'Copy link'}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function DocumentPage() {
   const params = useParams<{ id: string }>()
@@ -38,6 +81,7 @@ export default function DocumentPage() {
         ownerPubkey: result.ownerPubkey,
         timestamp: result.timestamp,
         lockingScriptHex: result.lockingScriptHex,
+        rawTxHex: result.rawTxHex,
       }),
     })
 
@@ -146,6 +190,11 @@ export default function DocumentPage() {
             <h2 className="font-semibold text-gray-800 mb-2 text-sm">Document Hash (SHA-256)</h2>
             <p className="font-mono text-xs text-gray-500 break-all">{document.sha256}</p>
           </div>
+
+          {/* Share links — only show to creator, only for pending signers */}
+          {identityKey === document.creatorKey && document.status === 'PENDING' && (
+            <ShareLinks signers={document.signers} />
+          )}
         </div>
       </div>
     </div>
