@@ -117,11 +117,17 @@ export default function SignPage() {
         // Step 3: Last signer broadcasts the final TX
         setBroadcasting(true)
         const allSigs: PartialSig[] = data.allSigs
-        const broadcastResult = await buildAndBroadcastMultisigDocument(
-          document.sha256,
-          document.title,
-          allSigs
-        )
+        let broadcastResult
+        try {
+          broadcastResult = await buildAndBroadcastMultisigDocument(
+            document.sha256,
+            document.title,
+            allSigs
+          )
+        } catch (broadcastErr) {
+          console.error('buildAndBroadcastMultisigDocument failed:', broadcastErr)
+          throw broadcastErr
+        }
 
         // Step 4: Record the broadcast on server
         const broadcastRes = await fetch(`/api/documents/${document.id}/multisig/broadcast`, {
@@ -255,8 +261,9 @@ export default function SignPage() {
 
       {/* ── Broadcasting spinner ────────────────────────────────────────────── */}
       {broadcasting && (
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
-          Broadcasting final transaction to the BSV blockchain...
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 space-y-1">
+          <p className="font-semibold">Broadcasting final transaction to the BSV blockchain...</p>
+          <p className="text-blue-600">If your wallet is showing an approval prompt, please confirm it now.</p>
         </div>
       )}
 

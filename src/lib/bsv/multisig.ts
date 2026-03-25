@@ -72,11 +72,16 @@ export async function buildAndBroadcastMultisigDocument(
     toBytes(JSON.stringify(provenance)),
   ]
 
+  // includeSignature=false: skip the internal PushDrop wallet.createSignature() call.
+  // All signing evidence is already embedded as partial sig fields — a redundant
+  // PushDrop integrity sig would require an extra wallet approval prompt and could hang.
   const lockingScript = await pd.lock(
     fields,
     [1, 'bitsign document signing'],
     docHash,
-    'self'
+    'self',
+    false,   // forSelf
+    false    // includeSignature
   )
 
   const lockingScriptHex = lockingScript.toHex()

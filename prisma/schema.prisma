@@ -60,6 +60,18 @@ enum SignerStatus {
   SIGNED
 }
 
+model Contact {
+  id          String   @id @default(cuid())
+  ownerKey    String                        // identity key of the person who saved this contact
+  identityKey String                        // identity key of the contact
+  name        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([ownerKey, identityKey])
+  @@index([ownerKey])
+}
+
 model SigningEvent {
   id          String   @id @default(cuid())
   documentId  String

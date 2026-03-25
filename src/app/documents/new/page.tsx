@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useWallet } from '@/hooks/useWallet'
 import { sha256File } from '@/lib/crypto/hash'
@@ -16,6 +16,12 @@ interface SignerInput {
   order: number
 }
 
+interface Contact {
+  id: string
+  identityKey: string
+  name: string
+}
+
 export default function NewDocumentPage() {
   const { connected, identityKey, connect } = useWallet()
   const router = useRouter()
@@ -28,6 +34,8 @@ export default function NewDocumentPage() {
   const [signers, setSigners] = useState<SignerInput[]>([])
   const [newSignerKey, setNewSignerKey] = useState('')
   const [newSignerHandle, setNewSignerHandle] = useState('')
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [showContactDropdown, setShowContactDropdown] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [signingError, setSigningError] = useState('')
@@ -38,6 +46,28 @@ export default function NewDocumentPage() {
   useEffect(() => {
     if (!connected) connect()
   }, [])
+
+  // Load contacts once wallet is connected
+  useEffect(() => {
+    if (!connected || !identityKey) return
+    fetch(`/api/contacts?ownerKey=${identityKey}`)
+      .then((r) => r.json())
+      .then((d) => setContacts(d.contacts ?? []))
+      .catch(() => {})
+  }, [connected, identityKey])
+
+  // Contacts filtered by what the user is typing
+  const filteredContacts = useMemo(() => {
+    const q = newSignerKey.toLowerCase().trim()
+    const nameQ = newSignerHandle.toLowerCase().trim()
+    return contacts.filter((c) => {
+      const alreadyAdded = signers.some((s) => s.identityKey === c.identityKey)
+      if (alreadyAdded) return false
+      if (q) return c.identityKey.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
+      if (nameQ) return c.name.toLowerCase().includes(nameQ)
+      return true
+    })
+  }, [contacts, newSignerKey, newSignerHandle, signers])
 
   async function handleFileSelect(f: File) {
     if (!SUPPORTED_MIME_TYPES.includes(f.type)) {
@@ -193,6 +223,19 @@ export default function NewDocumentPage() {
         }
       }
 
+      // Auto-save signers as contacts (non-blocking, best-effort)
+      if (signers.length > 0 && identityKey) {
+        for (const s of signers) {
+          if (s.handle) {
+            fetch('/api/contacts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ownerKey: identityKey, identityKey: s.identityKey, name: s.handle }),
+            }).catch(() => {})
+          }
+        }
+      }
+
       if (isMultisig) {
         // Send creator straight to their sign page — no "done" detour
         const creatorSigner = document.signers.find(
@@ -323,24 +366,50 @@ export default function NewDocumentPage() {
               type="text"
               value={newSignerHandle}
               onChange={(e) => setNewSignerHandle(e.target.value)}
-              placeholder="Name or handle (optional)"
+              onFocus={() => setShowContactDropdown(true)}
+              onBlur={() => setTimeout(() => setShowContactDropdown(false), 150)}
+              placeholder="Name (optional — saved to contacts)"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
             />
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newSignerKey}
-                onChange={(e) => setNewSignerKey(e.target.value)}
-                placeholder="BSV identity key (compressed pubkey hex)"
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 font-mono"
-              />
-              <button
-                onClick={addSigner}
-                disabled={!newSignerKey.trim()}
-                className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm disabled:opacity-40 hover:bg-gray-900 transition-colors"
-              >
-                Add
-              </button>
+            <div className="relative">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newSignerKey}
+                  onChange={(e) => setNewSignerKey(e.target.value)}
+                  onFocus={() => setShowContactDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowContactDropdown(false), 150)}
+                  placeholder="BSV identity key (hex) or search contacts"
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 font-mono"
+                />
+                <button
+                  onClick={addSigner}
+                  disabled={!newSignerKey.trim()}
+                  className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm disabled:opacity-40 hover:bg-gray-900 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+
+              {/* Contact dropdown */}
+              {showContactDropdown && filteredContacts.length > 0 && (
+                <div className="absolute z-10 top-full mt-1 left-0 right-10 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {filteredContacts.map((c) => (
+                    <button
+                      key={c.id}
+                      onMouseDown={() => {
+                        setNewSignerKey(c.identityKey)
+                        setNewSignerHandle(c.name)
+                        setShowContactDropdown(false)
+                      }}
+                      className="w-full text-left px-3 py-2.5 hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                    >
+                      <p className="text-sm font-medium text-gray-800">{c.name}</p>
+                      <p className="text-xs font-mono text-gray-400 truncate">{c.identityKey.slice(0, 20)}...</p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
