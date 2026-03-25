@@ -117,9 +117,11 @@ export function SigningTimeline({ signers, myIdentityKey, contacts = [], onAddCo
             <div className="flex-1 pb-2 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-medium text-sm text-gray-700 truncate">
-                  {signer.handle
-                    ?? contacts.find((c) => c.identityKey === signer.identityKey)?.name
-                    ?? `${signer.identityKey.slice(0, 10)}…${signer.identityKey.slice(-6)}`}
+                  {isMe
+                    ? 'You'
+                    : signer.handle
+                      ?? contacts.find((c) => c.identityKey === signer.identityKey)?.name
+                      ?? `${signer.identityKey.slice(0, 10)}…${signer.identityKey.slice(-6)}`}
                 </span>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0
