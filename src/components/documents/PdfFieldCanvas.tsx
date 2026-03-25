@@ -73,16 +73,28 @@ export default function PdfFieldCanvas({ file, signers, fields, onFieldsChange }
     setIsMobile(isMobileDevice())
   }, [])
 
-  // Load PDF
+  // Load PDF using FileReader for better WebView compatibility
   useEffect(() => {
     if (!file) return
 
-    const loadPdf = async () => {
-      setLoading(true)
-      setPdfError(null)
+    setLoading(true)
+    setPdfError(null)
+
+    const reader = new FileReader()
+    
+    reader.onload = async () => {
       try {
-        const arrayBuffer = await file.arrayBuffer()
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        const typedArray = new Uint8Array(reader.result as ArrayBuffer)
+        console.log('[PdfFieldCanvas] File read, size:', typedArray.length)
+        
+        if (typedArray.length === 0) {
+          throw new Error('File is empty')
+        }
+        
+        const loadingTask = pdfjsLib.getDocument({ data: typedArray })
+        const pdf = await loadingTask.promise
+        console.log('[PdfFieldCanvas] PDF loaded, pages:', pdf.numPages)
+        
         setPdfDoc(pdf)
         setNumPages(pdf.numPages)
       } catch (err) {
@@ -92,8 +104,14 @@ export default function PdfFieldCanvas({ file, signers, fields, onFieldsChange }
         setLoading(false)
       }
     }
-
-    loadPdf()
+    
+    reader.onerror = () => {
+      console.error('[PdfFieldCanvas] FileReader error:', reader.error)
+      setPdfError('Failed to read file')
+      setLoading(false)
+    }
+    
+    reader.readAsArrayBuffer(file)
   }, [file])
 
   // Set default signer when signers change
