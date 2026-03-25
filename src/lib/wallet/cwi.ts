@@ -29,9 +29,28 @@ export function getWalletClient(): WalletClient {
 // Connect to wallet and return the identity public key
 export async function connectWallet(): Promise<string> {
   const client = getWalletClient()
-  await client.connectToSubstrate()
+  try {
+    await client.connectToSubstrate()
+  } catch (err) {
+    // Map the SDK's generic "no substrate" error to our typed error
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.includes('No wallet available') || msg.includes('communication substrate')) {
+      throw new WalletNotInstalledError()
+    }
+    throw err
+  }
   const result = await client.getPublicKey({ identityKey: true })
   return result.publicKey
+}
+
+/** True when running inside BSV Browser's WebView (window.CWI is injected). */
+export function isInBSVBrowser(): boolean {
+  return typeof window !== 'undefined' && typeof (window as any).CWI === 'object'
+}
+
+/** True when running on a mobile device. */
+export function isMobileDevice(): boolean {
+  return typeof window !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 }
 
 export function isWalletAvailable(): boolean {
