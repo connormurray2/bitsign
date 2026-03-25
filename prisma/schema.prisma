@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Document {
+  id            String        @id @default(cuid())
+  title         String
+  s3Key         String        @unique
+  sha256        String
+  creatorKey    String
+  status        DocStatus     @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  expiresAt     DateTime?
+
+  signers       Signer[]
+  signingEvents SigningEvent[]
+
+  @@index([creatorKey])
+  @@index([status])
+}
+
+enum DocStatus {
+  PENDING
+  COMPLETE
+  EXPIRED
+  CANCELLED
+}
+
+model Signer {
+  id           String       @id @default(cuid())
+  documentId   String
+  document     Document     @relation(fields: [documentId], references: [id])
+  identityKey  String
+  handle       String?
+  order        Int
+  status       SignerStatus  @default(PENDING)
+  token        String       @unique @default(cuid())
+  notifiedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  signingEvent SigningEvent?
+
+  @@unique([documentId, identityKey])
+  @@index([documentId])
+  @@index([token])
+}
+
+enum SignerStatus {
+  PENDING
+  NOTIFIED
+  SIGNED
+}
+
+model SigningEvent {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id])
+  signerId    String   @unique
+  signer      Signer   @relation(fields: [signerId], references: [id])
+  identityKey String
+  txid        String   @unique
+  outputIndex Int      @default(0)
+  docHash     String
+  ecdsaSig    String
+  timestamp   DateTime
+  rawTx       String?
+  createdAt   DateTime @default(now())
+
+  @@index([documentId])
+  @@index([identityKey])
+  @@index([txid])
+}
