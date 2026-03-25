@@ -71,12 +71,16 @@ export default function DocumentPage() {
   }, [identityKey])
 
   async function handleAddContact(signerIdentityKey: string, name: string) {
-    if (!identityKey) return
-    await fetch('/api/contacts', {
+    if (!identityKey) throw new Error('Wallet not connected')
+    const res = await fetch('/api/contacts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ownerKey: identityKey, identityKey: signerIdentityKey, name }),
     })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error ?? 'Failed to save contact')
+    }
     setContacts((prev) => [...prev, { identityKey: signerIdentityKey, name }])
   }
 

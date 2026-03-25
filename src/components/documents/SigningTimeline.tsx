@@ -27,6 +27,7 @@ function AddContactInline({
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   if (saved) return <span className="text-xs text-green-600 font-medium">Saved</span>
 
@@ -44,36 +45,45 @@ function AddContactInline({
   async function handleSave() {
     if (!name.trim()) return
     setSaving(true)
-    await onSave(name.trim())
-    setSaved(true)
+    setSaveError('')
+    try {
+      await onSave(name.trim())
+      setSaved(true)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save')
+      setSaving(false)
+    }
   }
 
   return (
-    <div className="flex items-center gap-1 mt-1">
-      <input
-        autoFocus
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') handleSave()
-          if (e.key === 'Escape') setOpen(false)
-        }}
-        placeholder="Enter a name…"
-        className="text-xs border border-gray-300 rounded px-2 py-0.5 w-32 focus:outline-none focus:border-blue-400"
-      />
-      <button
-        onClick={handleSave}
-        disabled={saving || !name.trim()}
-        className="text-xs px-2 py-0.5 bg-blue-600 text-white rounded disabled:opacity-50"
-      >
-        {saving ? '…' : 'Save'}
-      </button>
-      <button
-        onClick={() => setOpen(false)}
-        className="text-xs text-gray-400 hover:text-gray-600"
-      >
-        ✕
-      </button>
+    <div className="mt-1 space-y-1">
+      <div className="flex items-center gap-1">
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSave()
+            if (e.key === 'Escape') setOpen(false)
+          }}
+          placeholder="Enter a name…"
+          className="text-xs border border-gray-300 rounded px-2 py-0.5 w-32 focus:outline-none focus:border-blue-400"
+        />
+        <button
+          onClick={handleSave}
+          disabled={saving || !name.trim()}
+          className="text-xs px-2 py-0.5 bg-blue-600 text-white rounded disabled:opacity-50"
+        >
+          {saving ? '…' : 'Save'}
+        </button>
+        <button
+          onClick={() => setOpen(false)}
+          className="text-xs text-gray-400 hover:text-gray-600"
+        >
+          ✕
+        </button>
+      </div>
+      {saveError && <p className="text-xs text-red-500">{saveError}</p>}
     </div>
   )
 }
