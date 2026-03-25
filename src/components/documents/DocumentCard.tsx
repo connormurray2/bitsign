@@ -14,15 +14,21 @@ const STATUS_COLORS: Record<string, string> = {
 interface Props {
   document: DocumentData
   variant?: 'created' | 'pending-signature'
+  mySignerToken?: string | null
 }
 
-export function DocumentCard({ document, variant }: Props) {
+export function DocumentCard({ document, variant, mySignerToken }: Props) {
   const signedCount = document.signers.filter((s) => s.status === 'SIGNED').length
   const totalCount = document.signers.length
 
+  const href =
+    variant === 'pending-signature' && mySignerToken
+      ? `/documents/sign/${mySignerToken}`
+      : `/documents/${document.id}`
+
   return (
     <Link
-      href={`/documents/${document.id}`}
+      href={href}
       className="block p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:shadow-sm transition-all bg-white"
     >
       <div className="flex items-start justify-between gap-3">
@@ -35,7 +41,7 @@ export function DocumentCard({ document, variant }: Props) {
               day: 'numeric',
             })}
             {variant === 'pending-signature' && (
-              <span className="ml-2 text-blue-600 font-medium">Awaiting your signature</span>
+              <span className="ml-2 text-blue-600 font-medium">→ Tap to sign</span>
             )}
           </p>
         </div>

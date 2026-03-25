@@ -66,6 +66,8 @@ export default function DocumentPage() {
 
   const mySigner = document?.signers.find((s) => s.identityKey === identityKey)
   const canSign = mySigner && mySigner.status !== 'SIGNED' && document?.status === 'PENDING'
+  // For multisig docs, signing happens via the share link page
+  const needsMultisigSign = document?.isMultisig && canSign
 
   async function handleSignSuccess(result: BroadcastResult) {
     if (!mySigner) return
@@ -161,8 +163,24 @@ export default function DocumentPage() {
             </div>
           )}
 
-          {/* Sign button */}
-          {canSign && !justSigned && (
+          {/* Multisig: direct to sign page */}
+          {needsMultisigSign && mySigner && (
+            <div className="bg-blue-50 border border-blue-300 rounded-xl p-4 space-y-3">
+              <p className="text-sm font-semibold text-blue-800">Your signature is required.</p>
+              <p className="text-sm text-blue-700">
+                This is a multisig document. Review the PDF above, then sign via your personal signing link.
+              </p>
+              <Link
+                href={`/documents/sign/${mySigner.token}`}
+                className="inline-block px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Sign Document
+              </Link>
+            </div>
+          )}
+
+          {/* Single-sig: sign button inline */}
+          {canSign && !needsMultisigSign && !justSigned && (
             <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
               <p className="text-sm text-gray-600">
                 Review the document above, then sign with your BSV wallet.

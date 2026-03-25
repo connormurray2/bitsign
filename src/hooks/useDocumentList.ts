@@ -4,9 +4,13 @@ import useSWR from 'swr'
 import type { DocumentData } from '@/types/document'
 import { useWallet } from './useWallet'
 
+export interface PendingSignatureDoc extends DocumentData {
+  mySignerToken: string | null
+}
+
 interface DocumentListResponse {
   created: DocumentData[]
-  pendingSignature: DocumentData[]
+  pendingSignature: PendingSignatureDoc[]
 }
 
 export function useDocumentList() {

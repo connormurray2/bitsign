@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useWallet } from '@/hooks/useWallet'
 import { useDocumentList } from '@/hooks/useDocumentList'
+import type { PendingSignatureDoc } from '@/hooks/useDocumentList'
 import { DocumentCard } from '@/components/documents/DocumentCard'
 
 export default function DashboardPage() {
@@ -44,8 +45,8 @@ export default function DashboardPage() {
             <section>
               <h2 className="text-lg font-semibold text-gray-700 mb-3">Awaiting Your Signature</h2>
               <div className="space-y-3">
-                {data.pendingSignature.map((doc) => (
-                  <DocumentCard key={doc.id} document={doc} variant="pending-signature" />
+                {data.pendingSignature.map((doc: PendingSignatureDoc) => (
+                  <DocumentCard key={doc.id} document={doc} variant="pending-signature" mySignerToken={doc.mySignerToken} />
                 ))}
               </div>
             </section>
