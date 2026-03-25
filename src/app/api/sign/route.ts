@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { PrismaClient } from '@prisma/client'
 import { prisma } from '@/lib/db/client'
 import { verifySigningTx } from '@/lib/bsv/verify'
 import type { SignResponse } from '@/types/api'
 
-type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 const schema = z.object({
   documentId: z.string().min(1),

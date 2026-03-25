@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { PrismaClient } from '@prisma/client'
 import { prisma } from '@/lib/db/client'
 import { verifySigningTx } from '@/lib/bsv/verify'
 import type { CreateDocumentResponse } from '@/types/api'
 
-type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 const signerSchema = z.object({
   identityKey: z.string().min(66).max(130),
