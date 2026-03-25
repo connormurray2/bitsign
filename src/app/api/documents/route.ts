@@ -12,12 +12,23 @@ const signerSchema = z.object({
   order: z.number().int().positive(),
 })
 
+const fieldSchema = z.object({
+  type: z.enum(['signature', 'initials', 'date', 'text']),
+  page: z.number().int().positive(),
+  x: z.number().min(0).max(100),
+  y: z.number().min(0).max(100),
+  width: z.number().min(0).max(100),
+  height: z.number().min(0).max(100),
+  assignedSignerKey: z.string().min(66).max(130),
+})
+
 const schema = z.object({
   title: z.string().min(1).max(255),
   s3Key: z.string().min(1),
   sha256: z.string().regex(/^[0-9a-f]{64}$/i),
   creatorIdentityKey: z.string().min(66).max(130),
   signers: z.array(signerSchema).min(1),
+  fields: z.array(fieldSchema).optional(),
   isMultisig: z.boolean().optional(),
   creatorSigningEvent: z.object({
     txid: z.string().length(64),
@@ -37,7 +48,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
     }
 
-    const { title, s3Key, sha256, creatorIdentityKey, signers, creatorSigningEvent, isMultisig } = parsed.data
+    const { title, s3Key, sha256, creatorIdentityKey, signers, fields, creatorSigningEvent, isMultisig } = parsed.data
 
     // Multisig documents are created without an upfront signing event
     const multisig = isMultisig === true || !creatorSigningEvent
@@ -76,8 +87,19 @@ export async function POST(req: NextRequest) {
               order: s.order,
             })),
           },
+          fields: fields ? {
+            create: fields.map((f) => ({
+              type: f.type,
+              page: f.page,
+              x: f.x,
+              y: f.y,
+              width: f.width,
+              height: f.height,
+              assignedSignerKey: f.assignedSignerKey,
+            })),
+          } : undefined,
         },
-        include: { signers: true, signingEvents: true },
+        include: { signers: true, signingEvents: true, fields: true },
       })
 
       if (!multisig && creatorSigningEvent && verification) {
@@ -117,7 +139,7 @@ export async function POST(req: NextRequest) {
 
       return tx.document.findUniqueOrThrow({
         where: { id: doc.id },
-        include: { signers: { include: { signingEvent: true } }, signingEvents: true },
+        include: { signers: { include: { signingEvent: true } }, signingEvents: true, fields: true },
       })
     })
 

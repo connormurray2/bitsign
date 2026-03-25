@@ -1,14 +1,22 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useWallet } from '@/hooks/useWallet'
 import { sha256File } from '@/lib/crypto/hash'
 import { signAndBroadcastDocument } from '@/lib/bsv/broadcast'
 import { MAX_FILE_SIZE_BYTES, SUPPORTED_MIME_TYPES } from '@/lib/utils/constants'
 import { BSV_EXPLORER_TX_URL } from '@/lib/utils/constants'
+import type { SigningField } from '@/components/documents/PdfFieldCanvas'
 
-type Step = 'upload' | 'signers' | 'sign' | 'done'
+// Dynamically import PdfFieldCanvas to avoid SSR issues with PDF.js
+const PdfFieldCanvas = dynamic(() => import('@/components/documents/PdfFieldCanvas'), {
+  ssr: false,
+  loading: () => <div className="h-full flex items-center justify-center text-gray-500">Loading PDF viewer...</div>
+})
+
+type Step = 'upload' | 'signers' | 'fields' | 'sign' | 'done'
 
 interface SignerInput {
   identityKey: string
@@ -41,6 +49,7 @@ export default function NewDocumentPage() {
   const [signingError, setSigningError] = useState('')
   const [createdDocId, setCreatedDocId] = useState('')
   const [creatorTxid, setCreatorTxid] = useState('')
+  const [fields, setFields] = useState<SigningField[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -105,6 +114,7 @@ export default function NewDocumentPage() {
       }
 
       setS3Key(key)
+      // Skip directly to fields if no signers, otherwise go to signers step
       setStep('signers')
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed')
@@ -154,6 +164,15 @@ export default function NewDocumentPage() {
           creatorIdentityKey: identityKey,
           signers: allSigners,
           isMultisig: true,
+          fields: fields.map((f) => ({
+            type: f.type,
+            page: f.page,
+            x: f.x,
+            y: f.y,
+            width: f.width,
+            height: f.height,
+            assignedSignerKey: f.assignedSignerKey,
+          })),
         }
       } else {
         // Single signer: sign and broadcast immediately
@@ -165,6 +184,15 @@ export default function NewDocumentPage() {
           sha256: docHash,
           creatorIdentityKey: broadcastResult.ownerPubkey,
           signers: [{ identityKey: broadcastResult.ownerPubkey, handle: '', order: 1 }],
+          fields: fields.map((f) => ({
+            type: f.type,
+            page: f.page,
+            x: f.x,
+            y: f.y,
+            width: f.width,
+            height: f.height,
+            assignedSignerKey: f.assignedSignerKey,
+          })),
           creatorSigningEvent: {
             txid: broadcastResult.txid,
             outputIndex: broadcastResult.outputIndex,
@@ -260,19 +288,19 @@ export default function NewDocumentPage() {
 
       {/* Progress steps */}
       <div className="flex items-center gap-2 mb-8">
-        {(['upload', 'signers', 'sign', 'done'] as Step[]).map((s, idx) => (
+        {(['upload', 'signers', 'fields', 'sign', 'done'] as Step[]).map((s, idx) => (
           <div key={s} className="flex items-center gap-2">
             <div
               className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
                 ${step === s ? 'bg-blue-600 text-white' :
-                  ['upload', 'signers', 'sign', 'done'].indexOf(step) > idx
+                  ['upload', 'signers', 'fields', 'sign', 'done'].indexOf(step) > idx
                     ? 'bg-green-500 text-white'
                     : 'bg-gray-200 text-gray-500'}`}
             >
-              {['upload', 'signers', 'sign', 'done'].indexOf(step) > idx ? '✓' : idx + 1}
+              {['upload', 'signers', 'fields', 'sign', 'done'].indexOf(step) > idx ? '✓' : idx + 1}
             </div>
             <span className="text-sm capitalize text-gray-600 hidden sm:block">{s}</span>
-            {idx < 3 && <div className="w-6 h-px bg-gray-300" />}
+            {idx < 4 && <div className="w-6 h-px bg-gray-300" />}
           </div>
         ))}
       </div>
@@ -421,15 +449,59 @@ export default function NewDocumentPage() {
           </div>
 
           <button
-            onClick={() => setStep('sign')}
+            onClick={() => setStep('fields')}
             className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
           >
-            Continue to Sign
+            Continue to Place Fields
           </button>
         </div>
       )}
 
-      {/* Step 3: Sign */}
+      {/* Step 3: Place Fields */}
+      {step === 'fields' && file && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-semibold text-gray-800">Place Signing Fields</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Drag field types onto the PDF to mark where each signer should sign or enter information.
+              </p>
+            </div>
+            <div className="text-sm text-gray-600">
+              {fields.length} field{fields.length !== 1 ? 's' : ''} placed
+            </div>
+          </div>
+
+          <div className="h-[600px]">
+            <PdfFieldCanvas
+              file={file}
+              signers={[
+                { identityKey: identityKey || '', handle: '', order: 1 },
+                ...signers,
+              ]}
+              fields={fields}
+              onFieldsChange={setFields}
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setStep('signers')}
+              className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+            >
+              ← Back to Signers
+            </button>
+            <button
+              onClick={() => setStep('sign')}
+              className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              Continue to Sign
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 4: Sign */}
       {step === 'sign' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <h2 className="font-semibold text-gray-800">Sign Document</h2>
@@ -471,7 +543,7 @@ export default function NewDocumentPage() {
         </div>
       )}
 
-      {/* Step 4: Done */}
+      {/* Step 5: Done */}
       {step === 'done' && (
         <div className="bg-white rounded-xl border border-green-300 p-6 space-y-4">
           <div className="flex items-center gap-3">

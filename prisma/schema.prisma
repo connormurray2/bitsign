@@ -20,6 +20,7 @@ model Document {
 
   signers       Signer[]
   signingEvents SigningEvent[]
+  fields        SigningField[]
 
   @@index([creatorKey])
   @@index([status])
@@ -90,4 +91,22 @@ model SigningEvent {
   @@index([documentId])
   @@index([identityKey])
   @@index([txid])
+}
+
+model SigningField {
+  id                String    @id @default(cuid())
+  documentId        String
+  document          Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  type              String    // "signature" | "initials" | "date" | "text"
+  page              Int
+  x                 Float
+  y                 Float
+  width             Float
+  height            Float
+  assignedSignerKey String
+  value             String?   // filled in when signer completes field
+  completedAt       DateTime?
+  createdAt         DateTime  @default(now())
+
+  @@index([documentId])
 }
