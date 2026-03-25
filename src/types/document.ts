@@ -20,6 +20,8 @@ export interface SignerData {
   status: SignerStatus
   token: string
   notifiedAt: string | null
+  partialSig: string | null
+  partialSigPubkey: string | null
   signingEvent: SigningEventData | null
 }
 
@@ -30,6 +32,7 @@ export interface DocumentData {
   sha256: string
   creatorKey: string
   status: DocStatus
+  isMultisig: boolean
   createdAt: string
   updatedAt: string
   expiresAt: string | null

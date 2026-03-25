@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'txid query param required (64 hex chars)' }, { status: 400 })
   }
 
-  const cachedEvent = await prisma.signingEvent.findUnique({
+  const cachedEvent = await prisma.signingEvent.findFirst({
     where: { txid },
   })
 

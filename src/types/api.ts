@@ -31,7 +31,8 @@ export interface CreateDocumentRequest {
   sha256: string
   creatorIdentityKey: string
   signers: SignerInput[]
-  creatorSigningEvent: CreatorSigningEventInput
+  isMultisig?: boolean
+  creatorSigningEvent?: CreatorSigningEventInput
 }
 export interface CreateDocumentResponse {
   document: DocumentData
@@ -71,6 +72,29 @@ export interface VerifyResponse {
   signatureValid: boolean
   documentId?: string
   error?: string
+}
+
+// POST /api/documents/[id]/multisig
+export interface MultisigSignRequest {
+  signerToken: string
+  sig: string   // DER hex
+  pubkey: string
+}
+export interface MultisigSignResponse {
+  isLast: boolean
+  allSigs?: Array<{ signerId: string; pubkey: string; sig: string }>
+}
+
+// POST /api/documents/[id]/multisig/broadcast
+export interface MultisigBroadcastRequest {
+  signerToken: string
+  txid: string
+  outputIndex: number
+  lockingScriptHex: string
+  rawTxHex?: string
+}
+export interface MultisigBroadcastResponse {
+  success: boolean
 }
 
 // POST /api/notify

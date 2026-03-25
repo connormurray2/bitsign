@@ -41,7 +41,7 @@ export function SigningTimeline({ signers }: Props) {
               </span>
             </div>
 
-            {signer.signingEvent && (
+            {signer.signingEvent ? (
               <div className="mt-1 text-xs text-gray-500 space-y-0.5">
                 <div>
                   Signed {new Date(signer.signingEvent.timestamp).toLocaleString()}
@@ -58,7 +58,11 @@ export function SigningTimeline({ signers }: Props) {
                   </a>
                 </div>
               </div>
-            )}
+            ) : signer.status === 'SIGNED' ? (
+              <div className="mt-1 text-xs text-amber-600">
+                Signature submitted — awaiting final broadcast
+              </div>
+            ) : null}
           </div>
         </div>
       ))}

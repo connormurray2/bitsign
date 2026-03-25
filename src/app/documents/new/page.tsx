@@ -108,25 +108,38 @@ export default function NewDocumentPage() {
     }
     setSigningError('')
     try {
-      // Sign the document as creator
-      const broadcastResult = await signAndBroadcastDocument(docHash, title)
+      const isMultisig = signers.length > 0
 
-      // Build full signers list: creator first, then additional signers
-      const allSigners = [
-        { identityKey: broadcastResult.ownerPubkey, handle: '', order: 1 },
-        ...signers.map((s) => ({ ...s, handle: s.handle || undefined })),
-      ]
+      let createBody: Record<string, unknown>
 
-      // Create the document record
-      const createRes = await fetch('/api/documents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      if (isMultisig) {
+        // Multisig: get creator's derived pubkey without broadcasting yet
+        const { getSigningPublicKey } = await import('@/lib/wallet/cwi')
+        const creatorPubkey = await getSigningPublicKey(docHash)
+
+        const allSigners = [
+          { identityKey: creatorPubkey, handle: '', order: 1 },
+          ...signers.map((s) => ({ ...s, handle: s.handle || undefined })),
+        ]
+
+        createBody = {
+          title,
+          s3Key,
+          sha256: docHash,
+          creatorIdentityKey: creatorPubkey,
+          signers: allSigners,
+          isMultisig: true,
+        }
+      } else {
+        // Single signer: sign and broadcast immediately
+        const broadcastResult = await signAndBroadcastDocument(docHash, title)
+
+        createBody = {
           title,
           s3Key,
           sha256: docHash,
           creatorIdentityKey: broadcastResult.ownerPubkey,
-          signers: allSigners,
+          signers: [{ identityKey: broadcastResult.ownerPubkey, handle: '', order: 1 }],
           creatorSigningEvent: {
             txid: broadcastResult.txid,
             outputIndex: broadcastResult.outputIndex,
@@ -135,7 +148,14 @@ export default function NewDocumentPage() {
             lockingScriptHex: broadcastResult.lockingScriptHex,
             rawTxHex: broadcastResult.rawTxHex,
           },
-        }),
+        }
+      }
+
+      // Create the document record
+      const createRes = await fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createBody),
       })
 
       if (!createRes.ok) {
@@ -145,7 +165,10 @@ export default function NewDocumentPage() {
 
       const { document } = await createRes.json()
       setCreatedDocId(document.id)
-      setCreatorTxid(broadcastResult.txid)
+      if (!isMultisig) {
+        const singleSigBody = createBody as { creatorSigningEvent?: { txid: string } }
+        setCreatorTxid(singleSigBody.creatorSigningEvent?.txid ?? '')
+      }
 
       // Notify other signers via MessageBox (client-side send)
       if (signers.length > 0) {
@@ -343,7 +366,9 @@ export default function NewDocumentPage() {
           </div>
 
           <p className="text-sm text-gray-500">
-            Clicking "Sign Document" will request your BSV wallet to sign the document hash and broadcast a 1-satoshi PUSH DROP transaction to the BSV blockchain.
+            {signers.length > 0
+              ? 'The document will be created and each signer (including you) will sign via their share link. The final BSV transaction is broadcast by the last signer.'
+              : 'Clicking "Sign & Create Document" will request your BSV wallet to sign the document hash and broadcast a 1-satoshi PUSH DROP transaction to the BSV blockchain.'}
           </p>
 
           {signingError && <p className="text-sm text-red-500 bg-red-50 rounded-lg p-3">{signingError}</p>}
@@ -357,7 +382,7 @@ export default function NewDocumentPage() {
               onClick={handleSignAndCreate}
               className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
             >
-              Sign & Create Document
+              {signers.length > 0 ? 'Create Document' : 'Sign & Create Document'}
             </button>
           )}
         </div>
@@ -376,23 +401,26 @@ export default function NewDocumentPage() {
               <span className="text-gray-500">Document ID</span>
               <span className="font-mono text-xs text-gray-700">{createdDocId}</span>
             </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-gray-500 shrink-0">Your TXID</span>
-              <a
-                href={`${BSV_EXPLORER_TX_URL}/${creatorTxid}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono text-xs text-blue-600 hover:underline text-right"
-              >
-                {creatorTxid.slice(0, 20)}...
-              </a>
-            </div>
+            {creatorTxid && (
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-500 shrink-0">Your TXID</span>
+                <a
+                  href={`${BSV_EXPLORER_TX_URL}/${creatorTxid}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-xs text-blue-600 hover:underline text-right"
+                >
+                  {creatorTxid.slice(0, 20)}...
+                </a>
+              </div>
+            )}
           </div>
 
           {signers.length > 0 && (
-            <p className="text-sm text-gray-500">
-              Signing invitations have been sent to {signers.length} signer{signers.length > 1 ? 's' : ''} via BSV MessageBox.
-            </p>
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+              <p className="font-medium mb-1">Multisig document created.</p>
+              <p>All {signers.length + 1} signers (including you) must sign via their share links. The final blockchain transaction will be broadcast by the last signer.</p>
+            </div>
           )}
 
           <button
