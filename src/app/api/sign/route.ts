@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { PrismaClient } from '@prisma/client'
 import { prisma } from '@/lib/db/client'
 import { verifySigningTx } from '@/lib/bsv/verify'
 import type { SignResponse } from '@/types/api'
+
+type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>
 
 const schema = z.object({
   documentId: z.string().min(1),
@@ -69,7 +72,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Record the signing event and update statuses atomically
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: TxClient) => {
       const event = await tx.signingEvent.create({
         data: {
           documentId,

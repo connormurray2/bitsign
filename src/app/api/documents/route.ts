@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { PrismaClient } from '@prisma/client'
 import { prisma } from '@/lib/db/client'
 import { verifySigningTx } from '@/lib/bsv/verify'
 import type { CreateDocumentResponse } from '@/types/api'
+
+type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>
 
 const signerSchema = z.object({
   identityKey: z.string().min(66).max(130),
@@ -51,7 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create document, signers, and creator's signing event atomically
-    const document = await prisma.$transaction(async (tx) => {
+    const document = await prisma.$transaction(async (tx: TxClient) => {
       const doc = await tx.document.create({
         data: {
           title,
