@@ -1,46 +1,50 @@
 'use client'
 
-import type { CWI } from '@/types/cwi'
+import { WalletClient } from '@bsv/sdk'
 
 export class WalletNotInstalledError extends Error {
   constructor() {
-    super('BSV Browser Wallet (window.CWI) is not installed. Please install the BSV Browser Wallet extension.')
+    super('No BSV wallet found. Open this app in the BSV Browser, or ensure the desktop wallet app is running.')
     this.name = 'WalletNotInstalledError'
   }
 }
 
 export class WalletLockedError extends Error {
   constructor() {
-    super('BSV Browser Wallet is locked. Please unlock your wallet.')
+    super('BSV wallet is locked. Please unlock your wallet.')
     this.name = 'WalletLockedError'
   }
 }
 
-export function getCWI(): CWI {
-  if (typeof window === 'undefined') {
-    throw new WalletNotInstalledError()
+let _walletClient: WalletClient | null = null
+
+export function getWalletClient(): WalletClient {
+  if (typeof window === 'undefined') throw new WalletNotInstalledError()
+  if (!_walletClient) {
+    _walletClient = new WalletClient('auto', window.location.hostname)
   }
-  if (!window.CWI) {
-    throw new WalletNotInstalledError()
-  }
-  return window.CWI
+  return _walletClient
 }
 
-export function isWalletAvailable(): boolean {
-  return typeof window !== 'undefined' && !!window.CWI
-}
-
-export async function getIdentityKey(): Promise<string> {
-  const cwi = getCWI()
-  const result = await cwi.getPublicKey({ identityKey: true })
+// Connect to wallet and return the identity public key
+export async function connectWallet(): Promise<string> {
+  const client = getWalletClient()
+  await client.connectToSubstrate()
+  const result = await client.getPublicKey({ identityKey: true })
   return result.publicKey
 }
 
-// Get the public key that corresponds to a createSignature call with the same params.
-// This is used to determine what pubkey to use as the PUSH DROP owner key.
+export function isWalletAvailable(): boolean {
+  return typeof window !== 'undefined'
+}
+
+export async function getIdentityKey(): Promise<string> {
+  return connectWallet()
+}
+
 export async function getSigningPublicKey(keyID: string): Promise<string> {
-  const cwi = getCWI()
-  const result = await cwi.getPublicKey({
+  const client = getWalletClient()
+  const result = await client.getPublicKey({
     protocolID: [1, 'bitsign document signing'],
     keyID,
     counterparty: 'self',

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { getIdentityKey, isWalletAvailable, WalletNotInstalledError } from './cwi'
+import { connectWallet, isWalletAvailable, WalletNotInstalledError } from './cwi'
 
 interface WalletState {
   connected: boolean
@@ -30,7 +30,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   // Attempt to restore session from sessionStorage on mount
   useEffect(() => {
     const stored = typeof window !== 'undefined' ? sessionStorage.getItem('bitsign_identity_key') : null
-    if (stored && isWalletAvailable()) {
+    if (stored) {
       setIdentityKey(stored)
       setConnected(true)
     }
@@ -40,13 +40,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setConnecting(true)
     setError(null)
     try {
-      const key = await getIdentityKey()
+      const key = await connectWallet()
       setIdentityKey(key)
       setConnected(true)
       sessionStorage.setItem('bitsign_identity_key', key)
     } catch (err) {
       if (err instanceof WalletNotInstalledError) {
-        setError('BSV Browser Wallet not installed. Please install the extension.')
+        setError('No BSV wallet found. Open this app in the BSV Browser app, or start the desktop wallet.')
       } else {
         setError(err instanceof Error ? err.message : 'Failed to connect wallet')
       }

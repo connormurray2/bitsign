@@ -1,6 +1,6 @@
 'use client'
 
-import { getCWI } from '../wallet/cwi'
+import { getWalletClient } from '../wallet/cwi'
 import { buildBitSignScript } from './pushdrop'
 import { PUSH_DROP_BASKET } from '../utils/constants'
 
@@ -26,19 +26,19 @@ export async function signAndBroadcastDocument(
   docHash: string,
   docTitle: string
 ): Promise<BroadcastResult> {
-  const cwi = getCWI()
+  const wallet = getWalletClient()
   const timestamp = new Date().toISOString()
 
   // Build locking script — wallet handles key derivation and signing
   const { lockingScriptHex, ownerPubkey } = await buildBitSignScript(
-    cwi as any,
+    wallet as any,
     docHash,
     docTitle,
     timestamp
   )
 
   // Broadcast transaction
-  const result = await cwi.createAction({
+  const result = await wallet.createAction({
     description: `BitSign: ${docTitle}`,
     outputs: [
       {
@@ -50,6 +50,8 @@ export async function signAndBroadcastDocument(
     ],
     labels: ['bitsign'],
   })
+
+  if (!result.txid) throw new Error('Wallet did not return a txid — transaction may be pending signature')
 
   return {
     txid: result.txid,
