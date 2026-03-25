@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     signingEvents: true,
   }
 
-  const [created, pendingSignature] = await Promise.all([
+  const [created, pendingSignature, signed] = await Promise.all([
     prisma.document.findMany({
       where: { creatorKey: identityKey },
       orderBy: { createdAt: 'desc' },
@@ -32,6 +32,20 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' },
       include: signerInclude,
     }),
+    // Docs where user signed but did not create
+    prisma.document.findMany({
+      where: {
+        creatorKey: { not: identityKey },
+        signers: {
+          some: {
+            identityKey,
+            status: 'SIGNED',
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: signerInclude,
+    }),
   ])
 
   // Annotate each pending doc with the user's signer token for direct sign-link routing
@@ -43,5 +57,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     created: JSON.parse(JSON.stringify(created)),
     pendingSignature: JSON.parse(JSON.stringify(pendingWithToken)),
+    signed: JSON.parse(JSON.stringify(signed)),
   })
 }

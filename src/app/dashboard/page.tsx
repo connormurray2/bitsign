@@ -52,6 +52,17 @@ export default function DashboardPage() {
             </section>
           )}
 
+          {data.signed.length > 0 && (
+            <section>
+              <h2 className="text-lg font-semibold text-gray-700 mb-3">Documents I Signed</h2>
+              <div className="space-y-3">
+                {data.signed.map((doc) => (
+                  <DocumentCard key={doc.id} document={doc} />
+                ))}
+              </div>
+            </section>
+          )}
+
           <section>
             <h2 className="text-lg font-semibold text-gray-700 mb-3">Documents I Created</h2>
             {data.created.length === 0 ? (

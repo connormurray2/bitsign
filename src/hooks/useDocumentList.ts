@@ -11,6 +11,7 @@ export interface PendingSignatureDoc extends DocumentData {
 interface DocumentListResponse {
   created: DocumentData[]
   pendingSignature: PendingSignatureDoc[]
+  signed: DocumentData[]
 }
 
 export function useDocumentList() {
