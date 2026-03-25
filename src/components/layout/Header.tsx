@@ -26,6 +26,14 @@ export function Header() {
           )}
           {connected && (
             <Link
+              href="/contacts"
+              className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              Contacts
+            </Link>
+          )}
+          {connected && (
+            <Link
               href="/documents/new"
               className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
             >
