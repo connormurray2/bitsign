@@ -113,12 +113,10 @@ export default function NewDocumentPage() {
       let createBody: Record<string, unknown>
 
       if (isMultisig) {
-        // Multisig: get creator's derived pubkey without broadcasting yet
-        const { getSigningPublicKey } = await import('@/lib/wallet/cwi')
-        const creatorPubkey = await getSigningPublicKey(docHash)
-
+        // Multisig: use root identity key for matching/lookup; derived key is
+        // only needed at signing time (the sign page calls createPartialSig).
         const allSigners = [
-          { identityKey: creatorPubkey, handle: '', order: 1 },
+          { identityKey, handle: '', order: 1 },
           ...signers.map((s) => ({ ...s, handle: s.handle || undefined })),
         ]
 
@@ -126,7 +124,7 @@ export default function NewDocumentPage() {
           title,
           s3Key,
           sha256: docHash,
-          creatorIdentityKey: creatorPubkey,
+          creatorIdentityKey: identityKey,
           signers: allSigners,
           isMultisig: true,
         }
@@ -164,11 +162,6 @@ export default function NewDocumentPage() {
       }
 
       const { document } = await createRes.json()
-      setCreatedDocId(document.id)
-      if (!isMultisig) {
-        const singleSigBody = createBody as { creatorSigningEvent?: { txid: string } }
-        setCreatorTxid(singleSigBody.creatorSigningEvent?.txid ?? '')
-      }
 
       // Notify other signers via MessageBox (client-side send)
       if (signers.length > 0) {
@@ -179,7 +172,6 @@ export default function NewDocumentPage() {
         })
         if (notifyRes.ok) {
           const { invites } = await notifyRes.json()
-          // Send invites via wallet CWI MessageBox
           if (typeof window !== 'undefined' && window.CWI && invites?.length) {
             for (const invite of invites) {
               try {
@@ -201,6 +193,21 @@ export default function NewDocumentPage() {
         }
       }
 
+      if (isMultisig) {
+        // Send creator straight to their sign page — no "done" detour
+        const creatorSigner = document.signers.find(
+          (s: { order: number; token: string }) => s.order === 1
+        )
+        if (creatorSigner) {
+          router.push(`/documents/sign/${creatorSigner.token}`)
+          return
+        }
+      }
+
+      // Single-sig done screen
+      const singleSigBody = createBody as { creatorSigningEvent?: { txid: string } }
+      setCreatorTxid(singleSigBody.creatorSigningEvent?.txid ?? '')
+      setCreatedDocId(document.id)
       setStep('done')
     } catch (err) {
       setSigningError(err instanceof Error ? err.message : 'Failed to sign document')
