@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import { isMobileDevice } from '@/lib/wallet/cwi'
 
-// Configure PDF.js worker - use local copy for WebView compatibility (BSV Browser)
-// CDN workers are blocked in some WebViews, so we serve it from /public
+// Disable PDF.js worker for WebView compatibility (BSV Browser)
+// Workers are problematic in WebViews - run on main thread instead
+// This is slower but works everywhere
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
+  pdfjsLib.GlobalWorkerOptions.workerSrc = ''
 }
 
 export type FieldType = 'signature' | 'initials' | 'date' | 'text'
@@ -64,6 +65,8 @@ export default function PdfFieldCanvas({ file, signers, fields, onFieldsChange }
   const [selectedSignerKey, setSelectedSignerKey] = useState<string>('')
   const [isMobile, setIsMobile] = useState(false)
   const [activeFieldType, setActiveFieldType] = useState<FieldType | null>(null) // For tap-to-place on mobile
+  const [pdfError, setPdfError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   // Detect mobile on mount
   useEffect(() => {
@@ -75,10 +78,19 @@ export default function PdfFieldCanvas({ file, signers, fields, onFieldsChange }
     if (!file) return
 
     const loadPdf = async () => {
-      const arrayBuffer = await file.arrayBuffer()
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-      setPdfDoc(pdf)
-      setNumPages(pdf.numPages)
+      setLoading(true)
+      setPdfError(null)
+      try {
+        const arrayBuffer = await file.arrayBuffer()
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        setPdfDoc(pdf)
+        setNumPages(pdf.numPages)
+      } catch (err) {
+        console.error('[PdfFieldCanvas] PDF load error:', err)
+        setPdfError(err instanceof Error ? err.message : 'Failed to load PDF')
+      } finally {
+        setLoading(false)
+      }
     }
 
     loadPdf()
@@ -350,15 +362,30 @@ export default function PdfFieldCanvas({ file, signers, fields, onFieldsChange }
           </div>
         </div>
 
-        <div className="p-8 overflow-auto h-[calc(100%-57px)] flex items-start justify-center">
-          <canvas
-            ref={canvasRef}
-            onClick={handleCanvasClick}
-            onDrop={handleCanvasDrop}
-            onDragOver={(e) => e.preventDefault()}
-            className="shadow-lg cursor-crosshair"
-            style={{ maxWidth: '100%', height: 'auto' }}
-          />
+        <div className="p-4 sm:p-8 overflow-auto h-[calc(100%-57px)] flex items-start justify-center">
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-3" />
+              <p className="text-sm">Loading PDF...</p>
+            </div>
+          )}
+          {pdfError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-md text-center">
+              <p className="text-red-700 font-medium mb-1">Failed to load PDF</p>
+              <p className="text-red-600 text-sm">{pdfError}</p>
+              <p className="text-gray-500 text-xs mt-2">Try a different PDF or use a desktop browser</p>
+            </div>
+          )}
+          {!loading && !pdfError && (
+            <canvas
+              ref={canvasRef}
+              onClick={handleCanvasClick}
+              onDrop={handleCanvasDrop}
+              onDragOver={(e) => e.preventDefault()}
+              className="shadow-lg cursor-crosshair"
+              style={{ maxWidth: '100%', height: 'auto' }}
+            />
+          )}
         </div>
       </div>
     </div>
