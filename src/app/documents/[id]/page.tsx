@@ -12,6 +12,12 @@ import { TxLink } from '@/components/blockchain/TxLink'
 import type { BroadcastResult } from '@/lib/bsv/broadcast'
 import type { SignerData } from '@/types/document'
 
+interface ContactEntry {
+  id: string
+  identityKey: string
+  name: string
+}
+
 function ShareLinks({ signers }: { signers: SignerData[] }) {
   const [copied, setCopied] = useState<string | null>(null)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
@@ -60,6 +66,27 @@ export default function DocumentPage() {
   const { data, mutate } = useDocument(params.id)
   const [signError, setSignError] = useState('')
   const [justSigned, setJustSigned] = useState<BroadcastResult | null>(null)
+  const [contacts, setContacts] = useState<ContactEntry[]>([])
+  const [addedKeys, setAddedKeys] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!identityKey) return
+    fetch(`/api/contacts?ownerKey=${identityKey}`)
+      .then((r) => r.json())
+      .then((d) => setContacts(d.contacts ?? []))
+      .catch(() => {})
+  }, [identityKey])
+
+  async function addContact(signer: SignerData) {
+    if (!identityKey) return
+    const name = signer.handle ?? signer.identityKey.slice(0, 12) + '…'
+    await fetch('/api/contacts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ownerKey: identityKey, identityKey: signer.identityKey, name }),
+    })
+    setAddedKeys((prev) => new Set(prev).add(signer.identityKey))
+  }
 
   const document = data?.document
   const downloadUrl = data?.downloadUrl
@@ -192,6 +219,38 @@ export default function DocumentPage() {
             <h2 className="font-semibold text-gray-800 mb-4">Signing Status</h2>
             <SigningTimeline signers={document.signers} />
           </div>
+
+          {/* Add other signers to contacts */}
+          {(() => {
+            const otherSigners = document.signers.filter(
+              (s) => s.identityKey !== identityKey &&
+                !contacts.some((c) => c.identityKey === s.identityKey) &&
+                !addedKeys.has(s.identityKey)
+            )
+            if (otherSigners.length === 0) return null
+            return (
+              <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                <h2 className="font-semibold text-gray-800 text-sm">Save to Contacts</h2>
+                <div className="space-y-2">
+                  {otherSigners.map((s) => (
+                    <div key={s.id} className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-gray-700 truncate">
+                          {s.handle ?? `${s.identityKey.slice(0, 16)}…`}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => addContact(s)}
+                        className="shrink-0 px-3 py-1 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-blue-600 hover:text-white transition-colors"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Document hash */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
