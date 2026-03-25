@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
 
     // Verify the creator's signing transaction on-chain
     const verification = await verifySigningTx(creatorSigningEvent.txid)
+    console.log('[documents] verification result:', JSON.stringify(verification))
     if (!verification.valid || !verification.signatureValid) {
       return NextResponse.json(
         { error: 'Creator signing transaction verification failed', detail: verification.error },
