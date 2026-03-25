@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     const { title, s3Key, sha256, creatorIdentityKey, signers, creatorSigningEvent } = parsed.data
 
     // Verify the creator's signing transaction on-chain
+    console.log('[documents] txid to verify:', creatorSigningEvent.txid)
     const verification = await verifySigningTx(creatorSigningEvent.txid)
     console.log('[documents] verification result:', JSON.stringify(verification))
     if (!verification.valid || !verification.signatureValid) {
