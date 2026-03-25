@@ -4,11 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import { isMobileDevice } from '@/lib/wallet/cwi'
 
-// Configure PDF.js worker - use local copy for WebView compatibility (BSV Browser)
-if (typeof window !== 'undefined') {
-  // Use .js extension for broader compatibility (some WebViews don't like .mjs)
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
-}
+// Worker will be configured in useEffect before loading PDF
 
 export type FieldType = 'signature' | 'initials' | 'date' | 'text'
 
@@ -78,6 +74,12 @@ export default function PdfFieldCanvas({ file, signers, fields, onFieldsChange }
 
     setLoading(true)
     setPdfError(null)
+
+    // Configure worker right before loading - must be set before getDocument()
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
+    }
+    console.log('[PdfFieldCanvas] Worker src:', pdfjsLib.GlobalWorkerOptions.workerSrc)
 
     const reader = new FileReader()
     
