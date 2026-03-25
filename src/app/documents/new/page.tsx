@@ -67,9 +67,15 @@ export default function NewDocumentPage() {
       })
       if (!res.ok) throw new Error('Failed to get upload URL')
       const { presignedUrl, s3Key: key } = await res.json()
+      console.log('[upload] presignedUrl:', presignedUrl)
 
       const putRes = await fetch(presignedUrl, { method: 'PUT', body: file })
-      if (!putRes.ok) throw new Error('Failed to upload file to S3')
+      console.log('[upload] PUT status:', putRes.status)
+      if (!putRes.ok) {
+        const body = await putRes.text()
+        console.error('[upload] PUT error body:', body)
+        throw new Error('Failed to upload file to S3')
+      }
 
       setS3Key(key)
       setStep('signers')

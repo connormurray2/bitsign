@@ -21,6 +21,12 @@ export async function POST(req: NextRequest) {
     const s3Key = generateS3Key(filename)
     const presignedUrl = await getUploadPresignedUrl(s3Key, contentType)
 
+    console.log('[upload] region:', process.env.AWS_REGION)
+    console.log('[upload] bucket:', process.env.S3_BUCKET)
+    console.log('[upload] key_id:', process.env.AWS_ACCESS_KEY_ID)
+    console.log('[upload] secret_tail:', process.env.AWS_SECRET_ACCESS_KEY?.slice(-4))
+    console.log('[upload] presignedUrl:', presignedUrl)
+
     return NextResponse.json<UploadResponse>({ presignedUrl, s3Key })
   } catch (err) {
     console.error('Upload route error:', err)
