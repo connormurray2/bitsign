@@ -31,7 +31,7 @@ interface GuidedSigningFlowProps {
 
 export function GuidedSigningFlow({ pdfUrl, fields, onComplete, onCancel }: GuidedSigningFlowProps) {
   const [currentFieldIndex, setCurrentFieldIndex] = useState(0)
-  const [fieldValues, setFieldValues] = useState<Map<string, string>>(new Map())
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
   const [showSignatureCanvas, setShowSignatureCanvas] = useState(false)
   const [textInput, setTextInput] = useState('')
   const [numPages, setNumPages] = useState<number>(0)
@@ -39,7 +39,7 @@ export function GuidedSigningFlow({ pdfUrl, fields, onComplete, onCancel }: Guid
 
   const currentField = fields[currentFieldIndex]
   const isLastField = currentFieldIndex === fields.length - 1
-  const currentValue = fieldValues.get(currentField?.id)
+  const currentValue = currentField ? fieldValues[currentField.id] : undefined
 
   // Auto-navigate to the current field's page
   const currentPage = currentField?.page ?? 1
@@ -58,17 +58,16 @@ export function GuidedSigningFlow({ pdfUrl, fields, onComplete, onCancel }: Guid
   }, [])
 
   function handleFieldComplete(value: string) {
-    const newValues = new Map(fieldValues)
-    newValues.set(currentField.id, value)
+    const newValues = { ...fieldValues, [currentField.id]: value }
     setFieldValues(newValues)
     setTextInput('')
     setShowSignatureCanvas(false)
 
     if (isLastField) {
-      // All fields complete - convert Map to array for API
-      const valuesArray = Array.from(newValues.entries()).map(([fieldId, value]) => ({
+      // All fields complete - convert to array for API
+      const valuesArray = Object.entries(newValues).map(([fieldId, val]) => ({
         fieldId,
-        value,
+        value: val,
       }))
       onComplete(valuesArray)
     } else {
@@ -165,7 +164,7 @@ export function GuidedSigningFlow({ pdfUrl, fields, onComplete, onCancel }: Guid
               />
               {/* Render completed field values */}
               {fields
-                .filter(f => f.page === currentPage && fieldValues.has(f.id))
+                .filter(f => f.page === currentPage && fieldValues[f.id])
                 .map(field => (
                   <div
                     key={field.id}
@@ -179,26 +178,26 @@ export function GuidedSigningFlow({ pdfUrl, fields, onComplete, onCancel }: Guid
                   >
                     {(field.type === 'signature' || field.type === 'initials') && (
                       <img
-                        src={fieldValues.get(field.id)}
+                        src={fieldValues[field.id]}
                         alt={field.type}
                         className="w-full h-full object-contain"
                       />
                     )}
                     {field.type === 'date' && (
                       <div className="w-full h-full flex items-center text-xs font-medium text-gray-800 bg-white/80 px-1">
-                        {new Date(fieldValues.get(field.id)!).toLocaleDateString()}
+                        {new Date(fieldValues[field.id]).toLocaleDateString()}
                       </div>
                     )}
                     {field.type === 'text' && (
                       <div className="w-full h-full flex items-center text-xs font-medium text-gray-800 bg-white/80 px-1">
-                        {fieldValues.get(field.id)}
+                        {fieldValues[field.id]}
                       </div>
                     )}
                   </div>
                 ))
               }
               {/* Highlight current field (if not yet completed) */}
-              {currentField.page === currentPage && !fieldValues.has(currentField.id) && (
+              {currentField.page === currentPage && !fieldValues[currentField.id] && (
                 <div style={getFieldStyle(currentField)} />
               )}
             </div>
@@ -316,7 +315,7 @@ export function GuidedSigningFlow({ pdfUrl, fields, onComplete, onCancel }: Guid
           {isLastField && currentValue && (
             <button
               onClick={() => {
-                const valuesArray = Array.from(fieldValues.entries()).map(([fieldId, value]) => ({
+                const valuesArray = Object.entries(fieldValues).map(([fieldId, value]) => ({
                   fieldId,
                   value,
                 }))
