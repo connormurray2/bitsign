@@ -1,5 +1,4 @@
-import { Transaction, PublicKey, Signature, LockingScript } from '@bsv/sdk'
-import { decodeBitSignScript, fromHex } from './pushdrop'
+import { decodeBitSignScript } from './pushdrop'
 import { WOC_API_BASE, BITSIGN_PROTOCOL_ID } from '../utils/constants'
 
 export interface VerificationResult {
@@ -14,13 +13,18 @@ export interface VerificationResult {
   error?: string
 }
 
-async function fetchRawTx(txid: string): Promise<string> {
-  const url = `${WOC_API_BASE}/tx/${txid}/hex`
+/** Fetch all output locking script hexes from WoC's JSON endpoint (most reliable). */
+async function fetchOutputScripts(txid: string): Promise<string[]> {
+  const url = `${WOC_API_BASE}/tx/${txid}`
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) {
     throw new Error(`Failed to fetch tx ${txid}: HTTP ${res.status}`)
   }
-  return res.text().then((t) => t.trim())
+  const json = await res.json()
+  // WoC response: { vout: [{ n, scriptPubKey: { hex } }] }
+  const vout: Array<{ n: number; scriptPubKey: { hex: string } }> = json.vout ?? []
+  console.log('[verify] WoC vout count:', vout.length)
+  return vout.map((o) => o.scriptPubKey?.hex ?? '')
 }
 
 export async function verifySigningTx(
@@ -40,16 +44,6 @@ export async function verifySigningTx(
   }
 
   console.log('[verify] Starting verification for txid:', txid)
-  console.log('[verify] rawTxHex provided:', !!rawTxHex, 'length:', rawTxHex?.length)
-
-  let rawHex: string
-  try {
-    rawHex = rawTxHex ?? (await fetchRawTx(txid))
-    console.log('[verify] Got rawHex, length:', rawHex.length, 'first 100 chars:', rawHex.slice(0, 100))
-  } catch (err) {
-    console.error('[verify] Failed to fetch transaction:', err)
-    return { ...empty, error: err instanceof Error ? err.message : 'Failed to fetch transaction' }
-  }
 
   try {
     let scriptHex: string
@@ -59,14 +53,19 @@ export async function verifySigningTx(
       console.log('[verify] Using stored lockingScriptHex directly')
       scriptHex = lockingScriptHex
     } else {
-      // Parse from raw TX, try each output until one decodes as a BitSign PUSH DROP
-      console.log('[verify] Step 1: Parsing transaction from hex...')
-      const tx = Transaction.fromHex(rawHex)
-      console.log('[verify] Step 2: Transaction parsed, outputs:', tx.outputs.length)
+      // Fetch parsed TX from WoC JSON endpoint and scan outputs for a BitSign PUSH DROP
+      console.log('[verify] Fetching TX outputs from WoC...')
+      let outputScripts: string[]
+      try {
+        outputScripts = await fetchOutputScripts(txid)
+      } catch (err) {
+        return { ...empty, error: err instanceof Error ? err.message : 'Failed to fetch transaction' }
+      }
 
       scriptHex = ''
-      for (let i = 0; i < tx.outputs.length; i++) {
-        const candidate = tx.outputs[i]?.lockingScript.toHex() ?? ''
+      for (let i = 0; i < outputScripts.length; i++) {
+        const candidate = outputScripts[i]
+        if (!candidate) continue
         try {
           const test = decodeBitSignScript(candidate)
           if (test.fields.protocolId === BITSIGN_PROTOCOL_ID) {
@@ -74,8 +73,8 @@ export async function verifySigningTx(
             console.log('[verify] Found BitSign output at index', i)
             break
           }
-        } catch {
-          // Not a BitSign output, try next
+        } catch (err) {
+          console.log('[verify] Output', i, 'not a BitSign PUSH DROP:', err instanceof Error ? err.message : err)
         }
       }
 
