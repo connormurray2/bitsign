@@ -13,18 +13,75 @@ export interface VerificationResult {
   error?: string
 }
 
-/** Fetch all output locking script hexes from WoC's JSON endpoint (most reliable). */
+/** Fetch all output locking script hexes — tries JSON endpoint first, falls back to raw hex. */
 async function fetchOutputScripts(txid: string): Promise<string[]> {
-  const url = `${WOC_API_BASE}/tx/${txid}`
-  const res = await fetch(url, { cache: 'no-store' })
-  if (!res.ok) {
-    throw new Error(`Failed to fetch tx ${txid}: HTTP ${res.status}`)
+  // Try JSON endpoint first (gives parsed scriptPubKey.hex directly)
+  const jsonUrl = `${WOC_API_BASE}/tx/${txid}`
+  const jsonRes = await fetch(jsonUrl, { cache: 'no-store' })
+  if (jsonRes.ok) {
+    const json = await jsonRes.json()
+    const vout: Array<{ n: number; scriptPubKey: { hex: string } }> = json.vout ?? []
+    console.log('[verify] WoC JSON vout count:', vout.length)
+    return vout.map((o) => o.scriptPubKey?.hex ?? '')
   }
-  const json = await res.json()
-  // WoC response: { vout: [{ n, scriptPubKey: { hex } }] }
-  const vout: Array<{ n: number; scriptPubKey: { hex: string } }> = json.vout ?? []
-  console.log('[verify] WoC vout count:', vout.length)
-  return vout.map((o) => o.scriptPubKey?.hex ?? '')
+
+  console.log('[verify] JSON endpoint returned', jsonRes.status, '— falling back to raw hex')
+
+  // Fall back to raw hex endpoint (works for mempool/unconfirmed txs too)
+  const hexUrl = `${WOC_API_BASE}/tx/${txid}/hex`
+  const hexRes = await fetch(hexUrl, { cache: 'no-store' })
+  if (!hexRes.ok) {
+    throw new Error(`Failed to fetch tx ${txid}: HTTP ${hexRes.status}`)
+  }
+  const rawHex = (await hexRes.text()).trim()
+  return extractOutputScriptsFromRawHex(rawHex)
+}
+
+/**
+ * Extract locking script hex strings from a raw serialized BSV transaction.
+ * Manual parser: version(4) + inputs(varint + N*input) + outputs(varint + N*output) + locktime(4)
+ * Output: value(8LE) + scriptLen(varint) + script
+ */
+function extractOutputScriptsFromRawHex(rawHex: string): string[] {
+  const bytes = Uint8Array.from({ length: rawHex.length / 2 }, (_, i) =>
+    parseInt(rawHex.slice(i * 2, i * 2 + 2), 16)
+  )
+  let pos = 0
+
+  function readUint32LE(): number {
+    const v = bytes[pos] | (bytes[pos+1] << 8) | (bytes[pos+2] << 16) | (bytes[pos+3] << 24)
+    pos += 4
+    return v >>> 0
+  }
+  function readVarInt(): number {
+    const first = bytes[pos++]
+    if (first < 0xfd) return first
+    if (first === 0xfd) { const v = bytes[pos] | (bytes[pos+1] << 8); pos += 2; return v }
+    if (first === 0xfe) { const v = readUint32LE(); return v }
+    pos += 8; return 0 // 0xff: 8-byte varint, not expected in practice
+  }
+
+  readUint32LE() // version
+  const inputCount = readVarInt()
+  for (let i = 0; i < inputCount; i++) {
+    pos += 36 // prev txid(32) + vout(4)
+    const scriptLen = readVarInt()
+    pos += scriptLen // scriptSig
+    pos += 4 // sequence
+  }
+
+  const outputCount = readVarInt()
+  const scripts: string[] = []
+  for (let i = 0; i < outputCount; i++) {
+    pos += 8 // value (8 bytes LE)
+    const scriptLen = readVarInt()
+    const scriptBytes = bytes.slice(pos, pos + scriptLen)
+    scripts.push(Array.from(scriptBytes).map(b => b.toString(16).padStart(2, '0')).join(''))
+    pos += scriptLen
+  }
+
+  console.log('[verify] Parsed', scripts.length, 'outputs from raw hex')
+  return scripts
 }
 
 export async function verifySigningTx(
