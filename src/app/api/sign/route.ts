@@ -13,7 +13,7 @@ const schema = z.object({
   outputIndex: z.number().int().min(0),
   ownerPubkey: z.string().min(66).max(130),
   timestamp: z.string().datetime(),
-  lockingScriptHex: z.string().min(1),
+  lockingScriptHex: z.string().min(1).optional(),
   rawTxHex: z.string().optional(),
   fieldValues: z.array(z.object({
     fieldId: z.string(),
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
     }
 
-    const { documentId, signerToken, txid, outputIndex, ownerPubkey, timestamp, rawTxHex, fieldValues } = parsed.data
+    const { documentId, signerToken, txid, outputIndex, ownerPubkey, timestamp, lockingScriptHex, rawTxHex, fieldValues } = parsed.data
 
     // Look up the signer by token
     const signer = await prisma.signer.findUnique({
@@ -50,8 +50,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Document is not pending signatures' }, { status: 409 })
     }
 
-    // Verify the signing transaction (use raw hex if provided to avoid WoC race condition)
-    const verification = await verifySigningTx(txid, rawTxHex)
+    // Verify the signing transaction
+    // If lockingScriptHex is provided, use it directly; otherwise fall back to rawTxHex or WoC
+    const verification = await verifySigningTx(txid, rawTxHex, lockingScriptHex)
     if (!verification.valid || !verification.signatureValid) {
       return NextResponse.json(
         { error: 'Transaction verification failed', detail: verification.error },
@@ -87,6 +88,7 @@ export async function POST(req: NextRequest) {
           docHash: signer.document.sha256,
           ecdsaSig: verification.embeddedSignature,
           timestamp: new Date(timestamp),
+          lockingScriptHex: lockingScriptHex ?? null,
         },
       })
 

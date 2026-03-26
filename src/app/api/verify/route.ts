@@ -14,7 +14,11 @@ export async function GET(req: NextRequest) {
     where: { txid },
   })
 
-  const verification = await verifySigningTx(txid, cachedEvent?.rawTx ?? undefined)
+  const verification = await verifySigningTx(
+    txid,
+    cachedEvent?.rawTx ?? undefined,
+    cachedEvent?.lockingScriptHex ?? undefined
+  )
 
   // Look up registered identity for the signer
   let registeredIdentity = null

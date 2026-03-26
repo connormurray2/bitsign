@@ -83,10 +83,11 @@ model SigningEvent {
   txid        String
   outputIndex Int      @default(0)
   docHash     String
-  ecdsaSig    String
-  timestamp   DateTime
-  rawTx       String?
-  createdAt   DateTime @default(now())
+  ecdsaSig          String
+  timestamp         DateTime
+  rawTx             String?
+  lockingScriptHex  String?
+  createdAt         DateTime @default(now())
 
   @@index([documentId])
   @@index([identityKey])

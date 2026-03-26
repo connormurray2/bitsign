@@ -25,7 +25,8 @@ async function fetchRawTx(txid: string): Promise<string> {
 
 export async function verifySigningTx(
   txid: string,
-  rawTxHex?: string
+  rawTxHex?: string,
+  lockingScriptHex?: string
 ): Promise<VerificationResult> {
   const empty: VerificationResult = {
     valid: false,
@@ -51,23 +52,44 @@ export async function verifySigningTx(
   }
 
   try {
-    console.log('[verify] Step 1: Parsing transaction from hex...')
-    const tx = Transaction.fromHex(rawHex)
-    console.log('[verify] Step 2: Transaction parsed, inputs:', tx.inputs.length, 'outputs:', tx.outputs.length)
-    
-    const output = tx.outputs[0]
-    if (!output) {
-      console.error('[verify] No outputs in transaction')
-      throw new Error('Transaction has no outputs')
+    let scriptHex: string
+
+    if (lockingScriptHex) {
+      // Use stored locking script directly — most reliable, no WoC dependency
+      console.log('[verify] Using stored lockingScriptHex directly')
+      scriptHex = lockingScriptHex
+    } else {
+      // Parse from raw TX, try each output until one decodes as a BitSign PUSH DROP
+      console.log('[verify] Step 1: Parsing transaction from hex...')
+      const tx = Transaction.fromHex(rawHex)
+      console.log('[verify] Step 2: Transaction parsed, outputs:', tx.outputs.length)
+
+      scriptHex = ''
+      for (let i = 0; i < tx.outputs.length; i++) {
+        const candidate = tx.outputs[i]?.lockingScript.toHex() ?? ''
+        try {
+          const test = decodeBitSignScript(candidate)
+          if (test.fields.protocolId === BITSIGN_PROTOCOL_ID) {
+            scriptHex = candidate
+            console.log('[verify] Found BitSign output at index', i)
+            break
+          }
+        } catch {
+          // Not a BitSign output, try next
+        }
+      }
+
+      if (!scriptHex) {
+        throw new Error('No BitSign PUSH DROP output found in transaction')
+      }
     }
-    
-    const lockingScriptHex = output.lockingScript.toHex()
-    console.log('[verify] Step 3: Locking script length:', lockingScriptHex.length, 'first 100:', lockingScriptHex.slice(0, 100))
+
+    console.log('[verify] Step 3: Locking script length:', scriptHex.length, 'first 100:', scriptHex.slice(0, 100))
 
     console.log('[verify] Step 4: Decoding BitSign script...')
     let decoded
     try {
-      decoded = decodeBitSignScript(lockingScriptHex)
+      decoded = decodeBitSignScript(scriptHex)
       console.log('[verify] Step 5: Decoded successfully')
     } catch (decodeErr) {
       console.error('[verify] Failed to decode BitSign script:', decodeErr)
