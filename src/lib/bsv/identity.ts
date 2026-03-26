@@ -19,7 +19,10 @@ export async function sha256DataUrl(dataUrl: string): Promise<string> {
     .join('')
 }
 
-/** Canonical commitment: SHA-256(JSON({firstName, lastName, signatureHash[, initialsHash]})) */
+/**
+ * Canonical commitment: SHA-256(JSON({firstName, lastName, signatureHash[, initialsHash]}))
+ * Omits initialsHash from JSON if not provided, preserving backward compatibility.
+ */
 export async function buildCommitmentHash(
   firstName: string,
   lastName: string,
@@ -37,7 +40,13 @@ export async function buildCommitmentHash(
 
 /**
  * Broadcast a bitsign-identity PUSH DROP to BSV.
- * Fields: [0]="bitsign-identity" [1]=commitmentHash(32 bytes) [2]=timestamp
+ *
+ * On-chain field layout:
+ *   [0] "bitsign-identity"          — protocol marker
+ *   [1] commitmentHash (32 bytes)   — SHA-256 of {firstName, lastName, sigHash[, initHash]}
+ *   [2] ISO timestamp
+ *   [3] ECDSA sig over commitmentHash — auto-added by PushDrop.lock()
+ *   owner key = wallet-derived pubkey (IDENTITY_PROTOCOL, keyID=commitmentHash)
  */
 export async function broadcastIdentityRegistration(
   firstName: string,
@@ -51,13 +60,23 @@ export async function broadcastIdentityRegistration(
 
   const pd = new PushDrop(wallet as any)
 
+  // Fields embedded in the PUSH DROP (PushDrop.lock appends an ECDSA sig as field[3])
   const fields: number[][] = [
     toBytes('bitsign-identity'),
-    fromHex(commitmentHash),
+    fromHex(commitmentHash),        // 32-byte commitment
     toBytes(timestamp),
   ]
 
-  const lockingScript = await pd.lock(fields, IDENTITY_PROTOCOL, commitmentHash, 'self')
+  // PushDrop.lock():
+  //   1. Derives owner pubkey via wallet.getPublicKey(IDENTITY_PROTOCOL, commitmentHash, 'self')
+  //   2. Signs concat(fields) via wallet.createSignature — appends as field[3]
+  //   3. Builds: <ownerPubkey> OP_CHECKSIG <field0> ... <field3> OP_2DROP OP_2DROP
+  const lockingScript = await pd.lock(
+    fields,
+    IDENTITY_PROTOCOL,
+    commitmentHash,   // keyID — unique per registration
+    'self'
+  )
 
   const { publicKey: ownerPubkey } = await wallet.getPublicKey({
     protocolID: IDENTITY_PROTOCOL,
@@ -78,7 +97,7 @@ export async function broadcastIdentityRegistration(
     labels: ['bitsign', 'bitsign-identity'],
   })
 
-  if (!result.txid) throw new Error('Wallet did not return a txid')
+  if (!result.txid) throw new Error('Wallet did not return a txid — transaction may be pending approval')
 
   let rawTxHex: string | undefined
   if (result.tx) {

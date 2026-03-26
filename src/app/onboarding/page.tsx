@@ -6,6 +6,7 @@ import { useWallet } from '@/hooks/useWallet'
 import { useProfile } from '@/hooks/useProfile'
 import { SignatureCanvas } from '@/components/signing/SignatureCanvas'
 import { sha256DataUrl, broadcastIdentityRegistration } from '@/lib/bsv/identity'
+import { BSV_EXPLORER_TX_URL } from '@/lib/utils/constants'
 
 type Step = 'name' | 'signature' | 'initials' | 'preview' | 'processing' | 'done'
 
@@ -25,6 +26,7 @@ function OnboardingContent() {
   const [canvasType, setCanvasType] = useState<'signature' | 'initials'>('signature')
   const [processingStep, setProcessingStep] = useState('')
   const [error, setError] = useState('')
+  const [registrationTxid, setRegistrationTxid] = useState('')
 
   // Redirect if already has profile
   useEffect(() => {
@@ -72,6 +74,7 @@ function OnboardingContent() {
       // 4. Broadcast identity PUSH DROP
       setProcessingStep('Broadcasting identity to BSV blockchain...')
       const { txid, commitmentHash } = await broadcastIdentityRegistration(firstName, lastName, signatureHash, initialsHash)
+      setRegistrationTxid(txid)
 
       // 5. Save to DB
       setProcessingStep('Saving profile...')
@@ -112,6 +115,16 @@ function OnboardingContent() {
         <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center text-white text-3xl mx-auto">✓</div>
         <h1 className="text-2xl font-bold text-gray-900">Identity Registered</h1>
         <p className="text-gray-500">Your identity has been anchored on the BSV blockchain.</p>
+        {registrationTxid && (
+          <a
+            href={`${BSV_EXPLORER_TX_URL}/${registrationTxid}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block text-xs font-mono text-blue-600 hover:underline break-all"
+          >
+            {registrationTxid}
+          </a>
+        )}
       </div>
     )
   }
