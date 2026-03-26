@@ -354,39 +354,34 @@ export default function SignPage() {
           {/* Sign buttons (only after guided flow is complete or no fields) */}
           {connected && mySigner.status !== 'SIGNED' && document.status === 'PENDING' && downloadUrl && (fields.length === 0 || guidedFlowCompleted) && (
             <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-              {/* Show signing options */}
-              {(fields.length === 0 || completedFieldValues.length > 0) && (
-                <>
-                  <p className="text-sm text-gray-600">
-                    {isMultisig
-                      ? 'I have reviewed the document and agree to sign it. My signature will be combined with others into a single BSV transaction.'
-                      : 'I have reviewed the document and agree to sign it electronically.'}
-                  </p>
-                  {completedFieldValues.length > 0 && (
-                    <div className="text-xs text-green-700 bg-green-50 p-2 rounded">
-                      {completedFieldValues.length} field(s) completed
-                    </div>
-                  )}
-                  {signError && <p className="text-sm text-red-500">{signError}</p>}
+              <p className="text-sm text-gray-600">
+                {isMultisig
+                  ? 'I have reviewed the document and agree to sign it. My signature will be combined with others into a single BSV transaction.'
+                  : 'I have reviewed the document and agree to sign it electronically.'}
+              </p>
+              {completedFieldValues.length > 0 && (
+                <div className="text-xs text-green-700 bg-green-50 p-2 rounded">
+                  {completedFieldValues.length} field(s) completed
+                </div>
+              )}
+              {signError && <p className="text-sm text-red-500">{signError}</p>}
 
-                  {isMultisig ? (
-                    <button
-                      onClick={handleMultisigSign}
-                      disabled={partialSigning}
-                      className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold disabled:opacity-50 hover:bg-blue-700 transition-colors"
-                    >
-                      {partialSigning ? 'Signing...' : 'Sign Document'}
-                    </button>
-                  ) : (
-                    <SignButton
-                      docHash={document.sha256}
-                      docTitle={document.title}
-                      onSuccess={handleSingleSignSuccess}
-                      onError={(err) => setSignError(err.message)}
-                      fieldValues={completedFieldValues}
-                    />
-                  )}
-                </>
+              {isMultisig ? (
+                <button
+                  onClick={handleMultisigSign}
+                  disabled={partialSigning}
+                  className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold disabled:opacity-50 hover:bg-blue-700 transition-colors"
+                >
+                  {partialSigning ? 'Signing...' : 'Sign Document'}
+                </button>
+              ) : (
+                <SignButton
+                  docHash={document.sha256}
+                  docTitle={document.title}
+                  onSuccess={handleSingleSignSuccess}
+                  onError={(err) => setSignError(err.message)}
+                  fieldValues={completedFieldValues}
+                />
               )}
             </div>
           )}
