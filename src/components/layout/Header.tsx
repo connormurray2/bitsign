@@ -34,9 +34,9 @@ export function Header() {
             </Link>
           )}
           {profile && (
-            <span className="text-sm font-medium text-gray-700 hidden sm:block">
+            <Link href="/profile/edit" className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors hidden sm:block">
               {profile.firstName} {profile.lastName}
-            </span>
+            </Link>
           )}
           <WalletStatus />
         </nav>
