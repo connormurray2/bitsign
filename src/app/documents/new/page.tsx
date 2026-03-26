@@ -273,11 +273,8 @@ export default function NewDocumentPage() {
         }
       }
 
-      // Single-sig done screen
-      const singleSigBody = createBody as { creatorSigningEvent?: { txid: string } }
-      setCreatorTxid(singleSigBody.creatorSigningEvent?.txid ?? '')
-      setCreatedDocId(document.id)
-      setStep('done')
+      // Redirect to document detail page
+      router.push(`/documents/${document.id}`)
     } catch (err) {
       setSigningError(err instanceof Error ? err.message : 'Failed to sign document')
     }

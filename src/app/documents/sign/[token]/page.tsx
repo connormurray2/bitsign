@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useWallet } from '@/hooks/useWallet'
 import { PDFViewer } from '@/components/documents/PDFViewer'
 import { PDFWithFields } from '@/components/documents/PDFWithFields'
@@ -27,6 +27,7 @@ interface SigningField {
 
 export default function SignPage() {
   const params = useParams<{ token: string }>()
+  const router = useRouter()
   const { connected, identityKey, connect, disconnect } = useWallet()
 
   const [docData, setDocData] = useState<GetDocumentResponse | null>(null)
@@ -109,7 +110,8 @@ export default function SignPage() {
       return
     }
 
-    setSignResult(result)
+    // Redirect to document detail page after signing
+    router.push(`/documents/${document.id}`)
   }
 
   // ── Multisig handler ─────────────────────────────────────────────────────────
@@ -145,7 +147,12 @@ export default function SignPage() {
       }
 
       const data = await res.json()
-      setPartialDone(true)
+
+      if (!data.isLast) {
+        // Not the last signer — redirect to document detail page
+        router.push(`/documents/${document.id}`)
+        return
+      }
 
       if (data.isLast) {
         // Step 3: Last signer broadcasts the final TX
@@ -187,10 +194,9 @@ export default function SignPage() {
           throw new Error(err.error ?? 'Failed to record broadcast')
         }
 
-        setBroadcastTxid(broadcastResult.txid)
         setBroadcasting(false)
 
-        // Step 5: Notify all other signers via MessageBox
+        // Step 5: Notify all other signers via MessageBox (best-effort, then redirect)
         try {
           const notifyRes = await fetch('/api/notify', {
             method: 'POST',
@@ -226,6 +232,9 @@ export default function SignPage() {
         } catch {
           // Non-fatal: notifications are best-effort
         }
+
+        // Redirect to document detail page after broadcast
+        router.push(`/documents/${document.id}`)
       }
     } catch (err) {
       setSignError(err instanceof Error ? err.message : 'Signing failed')
