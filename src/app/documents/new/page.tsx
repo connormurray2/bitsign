@@ -281,7 +281,7 @@ export default function NewDocumentPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className={`mx-auto px-4 py-8 ${step === 'fields' ? 'max-w-7xl' : 'max-w-2xl'}`}>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">New Document</h1>
 
       {/* Progress steps */}
@@ -470,7 +470,7 @@ export default function NewDocumentPage() {
             </div>
           </div>
 
-          <div className="h-[600px]">
+          <div className="h-[calc(100vh-320px)] min-h-[500px]">
             <PdfFieldCanvas
               file={file}
               signers={[
