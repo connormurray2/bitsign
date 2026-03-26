@@ -179,7 +179,7 @@ export function GuidedSigningFlow({ pdfUrl, fields, completedFields = [], onComp
                       height: `${field.height}%`,
                     }}
                   >
-                    {(field.type === 'signature' || field.type === 'initials') && field.value?.startsWith('data:image') && (
+                    {(field.type === 'signature' || field.type === 'initials') && field.value && (
                       <img
                         src={field.value}
                         alt={field.type}

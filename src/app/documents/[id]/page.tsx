@@ -143,12 +143,23 @@ export default function DocumentPage() {
             </span>
           </p>
         </div>
-        <Link
-          href={`/documents/${document.id}/verify`}
-          className="text-sm text-blue-600 hover:underline shrink-0"
-        >
-          Verify on-chain
-        </Link>
+        <div className="flex items-center gap-3 shrink-0">
+          {document.status === 'COMPLETE' && downloadUrl && (
+            <a
+              href={downloadUrl}
+              download={`${document.title}.pdf`}
+              className="text-sm font-medium text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Download PDF
+            </a>
+          )}
+          <Link
+            href={`/documents/${document.id}/verify`}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Verify on-chain
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

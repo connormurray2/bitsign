@@ -85,7 +85,7 @@ export function PDFWithFields({ url, fields }: PDFWithFieldsProps) {
                   }}
                 >
                   {/* Signature/Initials: render the image */}
-                  {(field.type === 'signature' || field.type === 'initials') && field.value?.startsWith('data:image') && (
+                  {(field.type === 'signature' || field.type === 'initials') && field.value && (
                     <img
                       src={field.value}
                       alt={field.type}
