@@ -60,6 +60,24 @@ export interface SignResponse {
   documentComplete: boolean
 }
 
+// Profile
+export interface UserProfilePublic {
+  firstName: string
+  lastName: string
+  registrationTxid: string
+  commitmentHash: string
+}
+
+export interface UserProfileFull extends UserProfilePublic {
+  id: string
+  identityKey: string
+  signatureS3Key: string
+  signatureHash: string
+  signatureUrl?: string
+  createdAt: string
+  updatedAt: string
+}
+
 // GET /api/verify
 export interface VerifyResponse {
   valid: boolean
@@ -71,6 +89,7 @@ export interface VerifyResponse {
   ownerPubkey: string
   signatureValid: boolean
   documentId?: string
+  registeredIdentity?: UserProfilePublic | null
   error?: string
 }
 

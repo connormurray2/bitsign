@@ -36,6 +36,22 @@ export function VerificationResult({ result }: Props) {
           <Field label="Document Title" value={result.docTitle} />
           <Field label="Document Hash (SHA-256)" value={result.docHash} mono />
           <Field label="Signer Public Key" value={result.ownerPubkey} mono />
+          {result.registeredIdentity && (
+            <>
+              <Field label="Registered Name" value={`${result.registeredIdentity.firstName} ${result.registeredIdentity.lastName}`} />
+              <div className="flex items-start justify-between gap-4">
+                <span className="font-medium text-gray-600 shrink-0">Identity Registration</span>
+                <a
+                  href={`${BSV_EXPLORER_TX_URL}/${result.registeredIdentity.registrationTxid}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline font-mono text-xs text-right break-all"
+                >
+                  {result.registeredIdentity.registrationTxid.slice(0, 16)}...
+                </a>
+              </div>
+            </>
+          )}
           <Field
             label="Signed At"
             value={result.timestamp ? new Date(result.timestamp).toLocaleString() : '—'}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useWallet } from '@/hooks/useWallet'
+import { useProfile } from '@/hooks/useProfile'
 import { PDFViewer } from '@/components/documents/PDFViewer'
 import { PDFWithFields } from '@/components/documents/PDFWithFields'
 import { SignButton } from '@/components/signing/SignButton'
@@ -29,6 +30,7 @@ export default function SignPage() {
   const params = useParams<{ token: string }>()
   const router = useRouter()
   const { connected, identityKey, connect, disconnect } = useWallet()
+  const { profile } = useProfile()
 
   const [docData, setDocData] = useState<GetDocumentResponse | null>(null)
   const [fields, setFields] = useState<SigningField[]>([])
@@ -330,6 +332,7 @@ export default function SignPage() {
               pdfUrl={downloadUrl}
               fields={fields}
               completedFields={allCompletedFields}
+              savedSignature={profile?.signatureUrl ?? undefined}
               onComplete={async (fieldValues) => {
                 setCompletedFieldValues(fieldValues)
                 

@@ -110,3 +110,34 @@ model SigningField {
 
   @@index([documentId])
 }
+
+model UserProfile {
+  id               String               @id @default(cuid())
+  identityKey      String               @unique
+  firstName        String
+  lastName         String
+  signatureS3Key   String
+  signatureHash    String
+  registrationTxid String
+  commitmentHash   String
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  registrations    ProfileRegistration[]
+
+  @@index([identityKey])
+}
+
+model ProfileRegistration {
+  id             String      @id @default(cuid())
+  identityKey    String
+  profile        UserProfile @relation(fields: [identityKey], references: [identityKey])
+  txid           String      @unique
+  commitmentHash String
+  firstName      String
+  lastName       String
+  signatureS3Key String
+  signatureHash  String
+  createdAt      DateTime    @default(now())
+
+  @@index([identityKey])
+}

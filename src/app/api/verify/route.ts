@@ -16,6 +16,21 @@ export async function GET(req: NextRequest) {
 
   const verification = await verifySigningTx(txid, cachedEvent?.rawTx ?? undefined)
 
+  // Look up registered identity for the signer
+  let registeredIdentity = null
+  if (verification.ownerPubkey) {
+    // Find by identityKey in DB — note ownerPubkey from PUSH DROP is a derived key,
+    // look up by the signing event's identityKey instead
+    const signingEvent = cachedEvent ?? await prisma.signingEvent.findFirst({ where: { txid } })
+    if (signingEvent) {
+      const profile = await prisma.userProfile.findUnique({
+        where: { identityKey: signingEvent.identityKey },
+        select: { firstName: true, lastName: true, registrationTxid: true, commitmentHash: true },
+      })
+      registeredIdentity = profile
+    }
+  }
+
   const response: VerifyResponse = {
     valid: verification.valid,
     txid,
@@ -26,6 +41,7 @@ export async function GET(req: NextRequest) {
     ownerPubkey: verification.ownerPubkey,
     signatureValid: verification.signatureValid,
     documentId: cachedEvent?.documentId,
+    registeredIdentity,
     error: verification.error,
   }
 

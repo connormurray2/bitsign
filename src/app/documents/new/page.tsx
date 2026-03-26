@@ -433,6 +433,16 @@ export default function NewDocumentPage() {
                 value={newSignerKey}
                 onChange={(e) => setNewSignerKey(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addSigner()}
+                onBlur={async () => {
+                  if (!newSignerKey || newSignerHandle) return
+                  try {
+                    const res = await fetch(`/api/profile?identityKey=${newSignerKey}`)
+                    const data = await res.json()
+                    if (data.profile?.firstName) {
+                      setNewSignerHandle(`${data.profile.firstName} ${data.profile.lastName}`)
+                    }
+                  } catch {}
+                }}
                 placeholder="BSV identity key (compressed pubkey hex)"
                 className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 font-mono"
               />

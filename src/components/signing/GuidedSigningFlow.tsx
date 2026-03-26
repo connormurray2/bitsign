@@ -28,9 +28,10 @@ interface GuidedSigningFlowProps {
   completedFields?: SigningField[] // Already completed fields from other signers
   onComplete: (fieldValues: { fieldId: string; value: string }[]) => void
   onCancel: () => void
+  savedSignature?: string
 }
 
-export function GuidedSigningFlow({ pdfUrl, fields, completedFields = [], onComplete, onCancel }: GuidedSigningFlowProps) {
+export function GuidedSigningFlow({ pdfUrl, fields, completedFields = [], onComplete, onCancel, savedSignature }: GuidedSigningFlowProps) {
   const [currentFieldIndex, setCurrentFieldIndex] = useState(0)
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
   const [showSignatureCanvas, setShowSignatureCanvas] = useState(false)
@@ -275,21 +276,55 @@ export function GuidedSigningFlow({ pdfUrl, fields, completedFields = [], onComp
         ) : (
           <>
             {currentField.type === 'signature' && (
-              <button
-                onClick={() => setShowSignatureCanvas(true)}
-                className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
-              >
-                Click to Sign
-              </button>
+              <>
+                {savedSignature && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-500">Use your registered signature:</p>
+                    <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 flex items-center justify-between gap-3">
+                      <img src={savedSignature} alt="Saved signature" className="max-h-12 flex-1 object-contain" />
+                      <button
+                        onClick={() => handleFieldComplete(savedSignature)}
+                        className="shrink-0 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700"
+                      >
+                        Use This
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 text-center">— or —</p>
+                  </div>
+                )}
+                <button
+                  onClick={() => setShowSignatureCanvas(true)}
+                  className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+                >
+                  Click to Sign
+                </button>
+              </>
             )}
 
             {currentField.type === 'initials' && (
-              <button
-                onClick={() => setShowSignatureCanvas(true)}
-                className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
-              >
-                Click to Add Initials
-              </button>
+              <>
+                {savedSignature && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-500">Use your registered signature:</p>
+                    <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 flex items-center justify-between gap-3">
+                      <img src={savedSignature} alt="Saved signature" className="max-h-12 flex-1 object-contain" />
+                      <button
+                        onClick={() => handleFieldComplete(savedSignature)}
+                        className="shrink-0 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700"
+                      >
+                        Use This
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 text-center">— or —</p>
+                  </div>
+                )}
+                <button
+                  onClick={() => setShowSignatureCanvas(true)}
+                  className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+                >
+                  Click to Add Initials
+                </button>
+              </>
             )}
 
             {currentField.type === 'date' && (
