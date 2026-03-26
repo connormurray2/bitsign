@@ -17,6 +17,7 @@ export async function GET(
           include: { signingEvent: true },
         },
         signingEvents: { orderBy: { createdAt: 'asc' } },
+        fields: { orderBy: { page: 'asc' } },
       },
     })
 

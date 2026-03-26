@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useWallet } from '@/hooks/useWallet'
 import { useDocument } from '@/hooks/useDocument'
 import { PDFViewer } from '@/components/documents/PDFViewer'
+import { PDFWithFields } from '@/components/documents/PDFWithFields'
 import { SigningTimeline } from '@/components/documents/SigningTimeline'
 import { SignButton } from '@/components/signing/SignButton'
 import { TxLink } from '@/components/blockchain/TxLink'
@@ -154,7 +155,13 @@ export default function DocumentPage() {
         {/* Left: PDF + signing */}
         <div className="lg:col-span-2 space-y-4">
           {downloadUrl ? (
-            <PDFViewer url={downloadUrl} />
+            document.fields && document.fields.length > 0 ? (
+              <div className="pdf-fields-container">
+                <PDFWithFields url={downloadUrl} fields={document.fields} />
+              </div>
+            ) : (
+              <PDFViewer url={downloadUrl} />
+            )
           ) : (
             <div className="border border-gray-200 rounded-xl p-8 text-center text-gray-400 bg-white">
               {connected ? 'Loading PDF...' : (
