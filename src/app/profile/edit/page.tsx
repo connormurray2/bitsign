@@ -18,11 +18,12 @@ export default function ProfileEditPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [newSignatureDataUrl, setNewSignatureDataUrl] = useState<string | null>(null)
+  const [newInitialsDataUrl, setNewInitialsDataUrl] = useState<string | null>(null)
   const [showCanvas, setShowCanvas] = useState(false)
+  const [canvasType, setCanvasType] = useState<'signature' | 'initials'>('signature')
   const [processingStep, setProcessingStep] = useState('')
   const [error, setError] = useState('')
 
-  // Pre-fill from current profile
   useEffect(() => {
     if (profile) {
       setFirstName(profile.firstName)
@@ -46,8 +47,21 @@ export default function ProfileEditPage() {
     )
   }
 
-  // Signature to show in preview — newly drawn takes precedence
   const previewSignatureUrl = newSignatureDataUrl ?? profile.signatureUrl ?? null
+  const previewInitialsUrl = newInitialsDataUrl ?? profile.initialsUrl ?? null
+
+  async function uploadPng(dataUrl: string): Promise<{ s3Key: string; hash: string }> {
+    const hash = await sha256DataUrl(dataUrl)
+    const blob = new Blob(
+      [Uint8Array.from(atob(dataUrl.split(',')[1]), (c) => c.charCodeAt(0))],
+      { type: 'image/png' }
+    )
+    const res = await fetch('/api/upload/signature', { method: 'POST' })
+    if (!res.ok) throw new Error('Failed to get upload URL')
+    const { presignedUrl, s3Key } = await res.json()
+    await fetch(presignedUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/png' } })
+    return { s3Key, hash }
+  }
 
   async function handleUpdate() {
     if (!identityKey) return
@@ -55,45 +69,35 @@ export default function ProfileEditPage() {
     setError('')
 
     try {
-      let s3Key = profile!.signatureS3Key
+      let signatureS3Key = profile!.signatureS3Key
       let signatureHash = profile!.signatureHash
+      let initialsS3Key = profile!.initialsS3Key ?? undefined
+      let initialsHash = profile!.initialsHash ?? undefined
 
-      // If a new signature was drawn, upload it
       if (newSignatureDataUrl) {
-        setProcessingStep('Hashing signature...')
-        signatureHash = await sha256DataUrl(newSignatureDataUrl)
-
         setProcessingStep('Uploading signature...')
-        const base64 = newSignatureDataUrl.split(',')[1]
-        const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
-        const blob = new Blob([bytes], { type: 'image/png' })
-
-        const uploadRes = await fetch('/api/upload/signature', { method: 'POST' })
-        if (!uploadRes.ok) throw new Error('Failed to get signature upload URL')
-        const { presignedUrl, s3Key: newS3Key } = await uploadRes.json()
-        s3Key = newS3Key
-
-        await fetch(presignedUrl, {
-          method: 'PUT',
-          body: blob,
-          headers: { 'Content-Type': 'image/png' },
-        })
+        const r = await uploadPng(newSignatureDataUrl)
+        signatureS3Key = r.s3Key
+        signatureHash = r.hash
       }
 
-      // Broadcast new identity PUSH DROP
+      if (newInitialsDataUrl) {
+        setProcessingStep('Uploading initials...')
+        const r = await uploadPng(newInitialsDataUrl)
+        initialsS3Key = r.s3Key
+        initialsHash = r.hash
+      }
+
       setProcessingStep('Broadcasting updated identity to BSV blockchain...')
       const { txid, commitmentHash } = await broadcastIdentityRegistration(
-        firstName,
-        lastName,
-        signatureHash
+        firstName, lastName, signatureHash, initialsHash
       )
 
-      // Save to DB
       setProcessingStep('Saving profile...')
       const saveRes = await fetch('/api/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-identity-key': identityKey },
-        body: JSON.stringify({ firstName, lastName, signatureS3Key: s3Key, signatureHash, registrationTxid: txid, commitmentHash }),
+        body: JSON.stringify({ firstName, lastName, signatureS3Key, signatureHash, initialsS3Key, initialsHash, registrationTxid: txid, commitmentHash }),
       })
       if (!saveRes.ok) {
         const err = await saveRes.json().catch(() => ({}))
@@ -163,23 +167,49 @@ export default function ProfileEditPage() {
             {newSignatureDataUrl ? (
               <div className="space-y-2">
                 <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                  <img src={newSignatureDataUrl} alt="New signature" className="max-h-24 mx-auto" />
+                  <img src={newSignatureDataUrl} alt="New signature" className="max-h-20 mx-auto" />
                 </div>
                 <p className="text-xs text-green-600 font-medium">New signature drawn</p>
               </div>
             ) : profile.signatureUrl ? (
               <div className="space-y-2">
                 <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                  <img src={profile.signatureUrl} alt="Current signature" className="max-h-24 mx-auto" />
+                  <img src={profile.signatureUrl} alt="Current signature" className="max-h-20 mx-auto" />
                 </div>
-                <p className="text-xs text-gray-400">Current signature — redraw to change</p>
+                <p className="text-xs text-gray-400">Current — redraw to change</p>
               </div>
             ) : null}
             <button
-              onClick={() => setShowCanvas(true)}
+              onClick={() => { setCanvasType('signature'); setShowCanvas(true) }}
               className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50"
             >
               {newSignatureDataUrl || profile.signatureUrl ? 'Redraw Signature' : 'Draw Signature'}
+            </button>
+          </div>
+
+          {/* Initials */}
+          <div className="space-y-3">
+            <h2 className="font-semibold text-gray-800 text-sm">Initials</h2>
+            {newInitialsDataUrl ? (
+              <div className="space-y-2">
+                <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                  <img src={newInitialsDataUrl} alt="New initials" className="max-h-20 mx-auto" />
+                </div>
+                <p className="text-xs text-green-600 font-medium">New initials drawn</p>
+              </div>
+            ) : profile.initialsUrl ? (
+              <div className="space-y-2">
+                <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                  <img src={profile.initialsUrl} alt="Current initials" className="max-h-20 mx-auto" />
+                </div>
+                <p className="text-xs text-gray-400">Current — redraw to change</p>
+              </div>
+            ) : null}
+            <button
+              onClick={() => { setCanvasType('initials'); setShowCanvas(true) }}
+              className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50"
+            >
+              {newInitialsDataUrl || profile.initialsUrl ? 'Redraw Initials' : 'Draw Initials'}
             </button>
           </div>
 
@@ -205,12 +235,19 @@ export default function ProfileEditPage() {
               <span className="text-gray-500">Signature</span>
               {previewSignatureUrl && (
                 <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 mt-2">
-                  <img src={previewSignatureUrl} alt="Signature" className="max-h-20 mx-auto" />
+                  <img src={previewSignatureUrl} alt="Signature" className="max-h-16 mx-auto" />
                 </div>
               )}
-              {newSignatureDataUrl && (
-                <p className="text-xs text-green-600">New signature will be saved</p>
+              {newSignatureDataUrl && <p className="text-xs text-green-600">New signature will be saved</p>}
+            </div>
+            <div className="py-2 border-b border-gray-100 space-y-2">
+              <span className="text-gray-500">Initials</span>
+              {previewInitialsUrl && (
+                <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 mt-2">
+                  <img src={previewInitialsUrl} alt="Initials" className="max-h-16 mx-auto" />
+                </div>
               )}
+              {newInitialsDataUrl && <p className="text-xs text-green-600">New initials will be saved</p>}
             </div>
             <p className="text-xs text-gray-400">
               A new identity registration will be broadcast to the BSV blockchain.
@@ -233,8 +270,12 @@ export default function ProfileEditPage() {
 
       {showCanvas && (
         <SignatureCanvas
-          type="signature"
-          onSave={(dataUrl) => { setNewSignatureDataUrl(dataUrl); setShowCanvas(false) }}
+          type={canvasType}
+          onSave={(dataUrl) => {
+            if (canvasType === 'signature') setNewSignatureDataUrl(dataUrl)
+            else setNewInitialsDataUrl(dataUrl)
+            setShowCanvas(false)
+          }}
           onCancel={() => setShowCanvas(false)}
         />
       )}

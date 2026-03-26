@@ -118,6 +118,8 @@ model UserProfile {
   lastName         String
   signatureS3Key   String
   signatureHash    String
+  initialsS3Key    String?
+  initialsHash     String?
   registrationTxid String
   commitmentHash   String
   createdAt        DateTime             @default(now())
@@ -137,6 +139,8 @@ model ProfileRegistration {
   lastName       String
   signatureS3Key String
   signatureHash  String
+  initialsS3Key  String?
+  initialsHash   String?
   createdAt      DateTime    @default(now())
 
   @@index([identityKey])

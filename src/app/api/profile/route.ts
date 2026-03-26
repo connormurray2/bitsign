@@ -20,6 +20,8 @@ const createSchema = z.object({
   lastName: z.string().min(1).max(100),
   signatureS3Key: z.string().min(1),
   signatureHash: z.string().regex(/^[0-9a-f]{64}$/i),
+  initialsS3Key: z.string().min(1).optional(),
+  initialsHash: z.string().regex(/^[0-9a-f]{64}$/i).optional(),
   registrationTxid: z.string().length(64),
   commitmentHash: z.string().regex(/^[0-9a-f]{64}$/i),
 })
@@ -33,17 +35,17 @@ export async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
-  const { firstName, lastName, signatureS3Key, signatureHash, registrationTxid, commitmentHash } = parsed.data
+  const { firstName, lastName, signatureS3Key, signatureHash, initialsS3Key, initialsHash, registrationTxid, commitmentHash } = parsed.data
 
   const profile = await prisma.userProfile.upsert({
     where: { identityKey },
-    create: { identityKey, firstName, lastName, signatureS3Key, signatureHash, registrationTxid, commitmentHash },
-    update: { firstName, lastName, signatureS3Key, signatureHash, registrationTxid, commitmentHash },
+    create: { identityKey, firstName, lastName, signatureS3Key, signatureHash, initialsS3Key, initialsHash, registrationTxid, commitmentHash },
+    update: { firstName, lastName, signatureS3Key, signatureHash, initialsS3Key, initialsHash, registrationTxid, commitmentHash },
   })
 
   // Always record this as a new registration snapshot
   await prisma.profileRegistration.create({
-    data: { identityKey, txid: registrationTxid, commitmentHash, firstName, lastName, signatureS3Key, signatureHash },
+    data: { identityKey, txid: registrationTxid, commitmentHash, firstName, lastName, signatureS3Key, signatureHash, initialsS3Key, initialsHash },
   })
 
   return NextResponse.json({ profile })

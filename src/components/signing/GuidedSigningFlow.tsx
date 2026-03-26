@@ -29,9 +29,10 @@ interface GuidedSigningFlowProps {
   onComplete: (fieldValues: { fieldId: string; value: string }[]) => void
   onCancel: () => void
   savedSignature?: string
+  savedInitials?: string
 }
 
-export function GuidedSigningFlow({ pdfUrl, fields, completedFields = [], onComplete, onCancel, savedSignature }: GuidedSigningFlowProps) {
+export function GuidedSigningFlow({ pdfUrl, fields, completedFields = [], onComplete, onCancel, savedSignature, savedInitials }: GuidedSigningFlowProps) {
   const [currentFieldIndex, setCurrentFieldIndex] = useState(0)
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
   const [showSignatureCanvas, setShowSignatureCanvas] = useState(false)
@@ -303,13 +304,13 @@ export function GuidedSigningFlow({ pdfUrl, fields, completedFields = [], onComp
 
             {currentField.type === 'initials' && (
               <>
-                {savedSignature && (
+                {savedInitials && (
                   <div className="space-y-2">
-                    <p className="text-xs text-gray-500">Use your registered signature:</p>
+                    <p className="text-xs text-gray-500">Use your registered initials:</p>
                     <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 flex items-center justify-between gap-3">
-                      <img src={savedSignature} alt="Saved signature" className="max-h-12 flex-1 object-contain" />
+                      <img src={savedInitials} alt="Saved initials" className="max-h-12 flex-1 object-contain" />
                       <button
-                        onClick={() => handleFieldComplete(savedSignature)}
+                        onClick={() => handleFieldComplete(savedInitials)}
                         className="shrink-0 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700"
                       >
                         Use This

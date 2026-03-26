@@ -19,14 +19,16 @@ export async function sha256DataUrl(dataUrl: string): Promise<string> {
     .join('')
 }
 
-/** Canonical commitment: SHA-256(JSON({firstName, lastName, signatureHash})) */
+/** Canonical commitment: SHA-256(JSON({firstName, lastName, signatureHash[, initialsHash]})) */
 export async function buildCommitmentHash(
   firstName: string,
   lastName: string,
-  signatureHash: string
+  signatureHash: string,
+  initialsHash?: string
 ): Promise<string> {
-  const data = JSON.stringify({ firstName, lastName, signatureHash })
-  const encoded = new TextEncoder().encode(data)
+  const payload: Record<string, string> = { firstName, lastName, signatureHash }
+  if (initialsHash) payload.initialsHash = initialsHash
+  const encoded = new TextEncoder().encode(JSON.stringify(payload))
   const hashBuffer = await crypto.subtle.digest('SHA-256', encoded)
   return Array.from(new Uint8Array(hashBuffer))
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -40,11 +42,12 @@ export async function buildCommitmentHash(
 export async function broadcastIdentityRegistration(
   firstName: string,
   lastName: string,
-  signatureHash: string
+  signatureHash: string,
+  initialsHash?: string
 ): Promise<{ txid: string; commitmentHash: string; ownerPubkey: string; rawTxHex?: string }> {
   const wallet = getWalletClient()
   const timestamp = new Date().toISOString()
-  const commitmentHash = await buildCommitmentHash(firstName, lastName, signatureHash)
+  const commitmentHash = await buildCommitmentHash(firstName, lastName, signatureHash, initialsHash)
 
   const pd = new PushDrop(wallet as any)
 

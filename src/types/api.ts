@@ -74,6 +74,9 @@ export interface UserProfileFull extends UserProfilePublic {
   signatureS3Key: string
   signatureHash: string
   signatureUrl?: string
+  initialsS3Key?: string | null
+  initialsHash?: string | null
+  initialsUrl?: string | null
   createdAt: string
   updatedAt: string
 }

@@ -7,7 +7,7 @@ import { useProfile } from '@/hooks/useProfile'
 import { SignatureCanvas } from '@/components/signing/SignatureCanvas'
 import { sha256DataUrl, broadcastIdentityRegistration } from '@/lib/bsv/identity'
 
-type Step = 'name' | 'signature' | 'preview' | 'processing' | 'done'
+type Step = 'name' | 'signature' | 'initials' | 'preview' | 'processing' | 'done'
 
 function OnboardingContent() {
   const { connected, identityKey, connect } = useWallet()
@@ -20,7 +20,9 @@ function OnboardingContent() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null)
+  const [initialsDataUrl, setInitialsDataUrl] = useState<string | null>(null)
   const [showCanvas, setShowCanvas] = useState(false)
+  const [canvasType, setCanvasType] = useState<'signature' | 'initials'>('signature')
   const [processingStep, setProcessingStep] = useState('')
   const [error, setError] = useState('')
 
@@ -41,30 +43,42 @@ function OnboardingContent() {
 
       // 2. Upload signature PNG to S3
       setProcessingStep('Uploading signature...')
-      const base64 = signatureDataUrl.split(',')[1]
-      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
-      const blob = new Blob([bytes], { type: 'image/png' })
+      const sigBlob = new Blob(
+        [Uint8Array.from(atob(signatureDataUrl.split(',')[1]), (c) => c.charCodeAt(0))],
+        { type: 'image/png' }
+      )
+      const sigUploadRes = await fetch('/api/upload/signature', { method: 'POST' })
+      if (!sigUploadRes.ok) throw new Error('Failed to get signature upload URL')
+      const { presignedUrl: sigUrl, s3Key: signatureS3Key } = await sigUploadRes.json()
+      await fetch(sigUrl, { method: 'PUT', body: sigBlob, headers: { 'Content-Type': 'image/png' } })
 
-      const uploadRes = await fetch('/api/upload/signature', { method: 'POST' })
-      if (!uploadRes.ok) throw new Error('Failed to get signature upload URL')
-      const { presignedUrl, s3Key } = await uploadRes.json()
+      // 3. Hash + upload initials PNG (if provided)
+      let initialsHash: string | undefined
+      let initialsS3Key: string | undefined
+      if (initialsDataUrl) {
+        setProcessingStep('Uploading initials...')
+        initialsHash = await sha256DataUrl(initialsDataUrl)
+        const initBlob = new Blob(
+          [Uint8Array.from(atob(initialsDataUrl.split(',')[1]), (c) => c.charCodeAt(0))],
+          { type: 'image/png' }
+        )
+        const initUploadRes = await fetch('/api/upload/signature', { method: 'POST' })
+        if (!initUploadRes.ok) throw new Error('Failed to get initials upload URL')
+        const { presignedUrl: initUrl, s3Key: initKey } = await initUploadRes.json()
+        initialsS3Key = initKey
+        await fetch(initUrl, { method: 'PUT', body: initBlob, headers: { 'Content-Type': 'image/png' } })
+      }
 
-      await fetch(presignedUrl, {
-        method: 'PUT',
-        body: blob,
-        headers: { 'Content-Type': 'image/png' },
-      })
-
-      // 3. Broadcast identity PUSH DROP
+      // 4. Broadcast identity PUSH DROP
       setProcessingStep('Broadcasting identity to BSV blockchain...')
-      const { txid, commitmentHash } = await broadcastIdentityRegistration(firstName, lastName, signatureHash)
+      const { txid, commitmentHash } = await broadcastIdentityRegistration(firstName, lastName, signatureHash, initialsHash)
 
-      // 4. Save to DB
+      // 5. Save to DB
       setProcessingStep('Saving profile...')
       const saveRes = await fetch('/api/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-identity-key': identityKey },
-        body: JSON.stringify({ firstName, lastName, signatureS3Key: s3Key, signatureHash, registrationTxid: txid, commitmentHash }),
+        body: JSON.stringify({ firstName, lastName, signatureS3Key, signatureHash, initialsS3Key, initialsHash, registrationTxid: txid, commitmentHash }),
       })
       if (!saveRes.ok) {
         const err = await saveRes.json().catch(() => ({}))
@@ -123,14 +137,14 @@ function OnboardingContent() {
       </div>
 
       <div className="flex gap-2 text-xs text-gray-400">
-        {['name', 'signature', 'preview'].map((s, i) => (
+        {['name', 'signature', 'initials', 'preview'].map((s, i) => (
           <div key={s} className="flex items-center gap-2">
             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
-              ${step === s ? 'bg-blue-600 text-white' : ['name','signature','preview'].indexOf(step) > i ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
-              {['name','signature','preview'].indexOf(step) > i ? '✓' : i + 1}
+              ${step === s ? 'bg-blue-600 text-white' : ['name','signature','initials','preview'].indexOf(step) > i ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+              {['name','signature','initials','preview'].indexOf(step) > i ? '✓' : i + 1}
             </div>
             <span className={step === s ? 'text-gray-700 font-medium' : ''}>{s.charAt(0).toUpperCase() + s.slice(1)}</span>
-            {i < 2 && <span>→</span>}
+            {i < 3 && <span>→</span>}
           </div>
         ))}
       </div>
@@ -178,13 +192,13 @@ function OnboardingContent() {
               <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                 <img src={signatureDataUrl} alt="Your signature" className="max-h-24 mx-auto" />
               </div>
-              <button onClick={() => setShowCanvas(true)} className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">
+              <button onClick={() => { setCanvasType('signature'); setShowCanvas(true) }} className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">
                 Redraw
               </button>
             </div>
           ) : (
             <button
-              onClick={() => setShowCanvas(true)}
+              onClick={() => { setCanvasType('signature'); setShowCanvas(true) }}
               className="w-full py-12 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors"
             >
               Tap to draw your signature
@@ -195,8 +209,47 @@ function OnboardingContent() {
               Back
             </button>
             <button
-              onClick={() => setStep('preview')}
+              onClick={() => setStep('initials')}
               disabled={!signatureDataUrl}
+              className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step: Initials */}
+      {step === 'initials' && (
+        <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+          <h2 className="font-semibold text-gray-800">Your Initials</h2>
+          <p className="text-sm text-gray-500">
+            Draw your initials — used when documents require initials rather than a full signature.
+          </p>
+          {initialsDataUrl ? (
+            <div className="space-y-3">
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <img src={initialsDataUrl} alt="Your initials" className="max-h-24 mx-auto" />
+              </div>
+              <button onClick={() => { setCanvasType('initials'); setShowCanvas(true) }} className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">
+                Redraw
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setCanvasType('initials'); setShowCanvas(true) }}
+              className="w-full py-12 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors"
+            >
+              Tap to draw your initials
+            </button>
+          )}
+          <div className="flex gap-2">
+            <button onClick={() => setStep('signature')} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+              Back
+            </button>
+            <button
+              onClick={() => setStep('preview')}
+              disabled={!initialsDataUrl}
               className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50"
             >
               Next
@@ -217,7 +270,13 @@ function OnboardingContent() {
             <div className="py-2 border-b border-gray-100 space-y-1">
               <span className="text-gray-500">Signature</span>
               <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 mt-2">
-                {signatureDataUrl && <img src={signatureDataUrl} alt="Signature preview" className="max-h-20 mx-auto" />}
+                {signatureDataUrl && <img src={signatureDataUrl} alt="Signature preview" className="max-h-16 mx-auto" />}
+              </div>
+            </div>
+            <div className="py-2 border-b border-gray-100 space-y-1">
+              <span className="text-gray-500">Initials</span>
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 mt-2">
+                {initialsDataUrl && <img src={initialsDataUrl} alt="Initials preview" className="max-h-16 mx-auto" />}
               </div>
             </div>
             <p className="text-xs text-gray-400">
@@ -226,7 +285,7 @@ function OnboardingContent() {
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex gap-2">
-            <button onClick={() => setStep('signature')} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+            <button onClick={() => setStep('initials')} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
               Back
             </button>
             <button
@@ -241,8 +300,12 @@ function OnboardingContent() {
 
       {showCanvas && (
         <SignatureCanvas
-          type="signature"
-          onSave={(dataUrl) => { setSignatureDataUrl(dataUrl); setShowCanvas(false) }}
+          type={canvasType}
+          onSave={(dataUrl) => {
+            if (canvasType === 'signature') setSignatureDataUrl(dataUrl)
+            else setInitialsDataUrl(dataUrl)
+            setShowCanvas(false)
+          }}
           onCancel={() => setShowCanvas(false)}
         />
       )}

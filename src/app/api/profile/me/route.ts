@@ -17,6 +17,9 @@ export async function GET(req: NextRequest) {
   if (!profile) return NextResponse.json({ profile: null })
 
   const signatureUrl = await getDownloadPresignedUrl(profile.signatureS3Key)
+  const initialsUrl = profile.initialsS3Key
+    ? await getDownloadPresignedUrl(profile.initialsS3Key)
+    : null
 
-  return NextResponse.json({ profile: { ...profile, signatureUrl } })
+  return NextResponse.json({ profile: { ...profile, signatureUrl, initialsUrl } })
 }

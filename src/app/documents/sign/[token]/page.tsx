@@ -333,6 +333,7 @@ export default function SignPage() {
               fields={fields}
               completedFields={allCompletedFields}
               savedSignature={profile?.signatureUrl ?? undefined}
+              savedInitials={profile?.initialsUrl ?? undefined}
               onComplete={async (fieldValues) => {
                 setCompletedFieldValues(fieldValues)
                 
