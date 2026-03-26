@@ -25,6 +25,19 @@ export interface SignerData {
   signingEvent: SigningEventData | null
 }
 
+export interface SigningFieldData {
+  id: string
+  type: string
+  page: number
+  x: number
+  y: number
+  width: number
+  height: number
+  assignedSignerKey: string
+  value: string | null
+  completedAt: string | null
+}
+
 export interface DocumentData {
   id: string
   title: string
@@ -38,4 +51,5 @@ export interface DocumentData {
   expiresAt: string | null
   signers: SignerData[]
   signingEvents: SigningEventData[]
+  fields?: SigningFieldData[]
 }
