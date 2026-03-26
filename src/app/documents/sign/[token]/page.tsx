@@ -10,7 +10,7 @@ import { GuidedSigningFlow } from '@/components/signing/GuidedSigningFlow'
 import type { BroadcastResult } from '@/lib/bsv/broadcast'
 import type { GetDocumentResponse } from '@/types/api'
 import type { PartialSig } from '@/lib/bsv/multisig'
-import { TxLink } from '@/components/blockchain/TxLink'
+
 
 interface SigningField {
   id: string
@@ -39,14 +39,9 @@ export default function SignPage() {
   const [guidedFlowCompleted, setGuidedFlowCompleted] = useState(false)
   const [completedFieldValues, setCompletedFieldValues] = useState<{ fieldId: string; value: string }[]>([])
 
-  // Single-sig result
-  const [signResult, setSignResult] = useState<BroadcastResult | null>(null)
-
   // Multisig states
   const [partialSigning, setPartialSigning] = useState(false)
-  const [partialDone, setPartialDone] = useState(false)
   const [broadcasting, setBroadcasting] = useState(false)
-  const [broadcastTxid, setBroadcastTxid] = useState<string | null>(null)
 
   // Resolve token to document and fields
   useEffect(() => {
@@ -241,7 +236,7 @@ export default function SignPage() {
       setPartialSigning(false)
       setBroadcasting(false)
     } finally {
-      if (!broadcastTxid) setPartialSigning(false)
+      setPartialSigning(false)
     }
   }
 
@@ -276,36 +271,6 @@ export default function SignPage() {
         )}
       </div>
 
-      {/* ── Multisig complete (last signer broadcast) ───────────────────────── */}
-      {broadcastTxid && (
-        <div className="p-5 bg-green-50 border border-green-300 rounded-xl space-y-3">
-          <p className="font-bold text-green-800 text-lg">Document fully signed.</p>
-          <p className="text-sm text-green-700">
-            All {totalSigners} signatures have been recorded on the BSV blockchain.
-          </p>
-          <TxLink txid={broadcastTxid} variant="full" />
-        </div>
-      )}
-
-      {/* ── Multisig partial sig submitted (not last) ───────────────────────── */}
-      {partialDone && !broadcastTxid && !broadcasting && (
-        <div className="p-4 bg-green-50 border border-green-300 rounded-xl text-sm space-y-1">
-          <p className="font-semibold text-green-800">Your signature has been recorded.</p>
-          {/* signedCount is from the initial fetch, before we signed. After signing, remaining = totalSigners - signedCount - 1 (us) */}
-          {totalSigners - signedCount - 1 > 0 ? (
-            <p className="text-green-700">
-              Waiting for the remaining {totalSigners - signedCount - 1} signer(s) to sign.
-              The final transaction will be broadcast by the last signer.
-            </p>
-          ) : (
-            <p className="text-green-700">
-              All signatures collected. The document should be broadcast shortly.
-              If you don&apos;t see a transaction ID, try refreshing the page.
-            </p>
-          )}
-        </div>
-      )}
-
       {/* ── Broadcasting spinner ────────────────────────────────────────────── */}
       {broadcasting && (
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 space-y-1">
@@ -314,17 +279,8 @@ export default function SignPage() {
         </div>
       )}
 
-      {/* ── Single-sig complete ─────────────────────────────────────────────── */}
-      {signResult && (
-        <div className="p-5 bg-green-50 border border-green-300 rounded-xl space-y-3">
-          <p className="font-bold text-green-800 text-lg">Document signed successfully.</p>
-          <p className="text-sm text-green-700">Your signature has been recorded on the BSV blockchain.</p>
-          <TxLink txid={signResult.txid} variant="full" />
-        </div>
-      )}
-
       {/* ── Main signing area (not yet signed) ──────────────────────────────── */}
-      {!signResult && !partialDone && !broadcastTxid && (
+      {!broadcasting && (
         <>
           {/* Already signed */}
           {mySigner.status === 'SIGNED' && (
