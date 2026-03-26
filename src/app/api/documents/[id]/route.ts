@@ -38,8 +38,21 @@ export async function GET(
       downloadUrl = await getDownloadPresignedUrl(document.s3Key)
     }
 
+    // Attach registered names from UserProfile for each signer
+    const signerKeys = document.signers.map((s: { identityKey: string }) => s.identityKey)
+    const profiles = await prisma.userProfile.findMany({
+      where: { identityKey: { in: signerKeys } },
+      select: { identityKey: true, firstName: true, lastName: true },
+    })
+    const profileMap = Object.fromEntries(profiles.map((p) => [p.identityKey, `${p.firstName} ${p.lastName}`]))
+
+    const signersWithNames = document.signers.map((s: { identityKey: string }) => ({
+      ...s,
+      registeredName: profileMap[s.identityKey] ?? null,
+    }))
+
     return NextResponse.json<GetDocumentResponse>({
-      document: JSON.parse(JSON.stringify(document)),
+      document: JSON.parse(JSON.stringify({ ...document, signers: signersWithNames })),
       downloadUrl,
     })
   } catch (err) {

@@ -95,7 +95,7 @@ export function SigningTimeline({ signers, myIdentityKey, contacts = [], onAddCo
     <div className="space-y-3">
       {signers.map((signer, idx) => {
         const isMe = signer.identityKey === myIdentityKey
-        const isKnown = isMe || signer.handle || contactKeys.has(signer.identityKey)
+        const isKnown = isMe || signer.handle || contactKeys.has(signer.identityKey) || !!signer.registeredName
         const showAdd = !isMe && !isKnown && !!onAddContact
 
         return (
@@ -121,6 +121,7 @@ export function SigningTimeline({ signers, myIdentityKey, contacts = [], onAddCo
                     ? 'You'
                     : signer.handle
                       ?? contacts.find((c) => c.identityKey === signer.identityKey)?.name
+                      ?? signer.registeredName
                       ?? `${signer.identityKey.slice(0, 10)}…${signer.identityKey.slice(-6)}`}
                 </span>
                 <span

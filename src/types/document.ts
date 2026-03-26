@@ -16,6 +16,7 @@ export interface SignerData {
   id: string
   identityKey: string
   handle: string | null
+  registeredName: string | null
   order: number
   status: SignerStatus
   token: string
