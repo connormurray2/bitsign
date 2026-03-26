@@ -27,7 +27,7 @@ interface SigningField {
 
 export default function SignPage() {
   const params = useParams<{ token: string }>()
-  const { connected, identityKey, connect } = useWallet()
+  const { connected, identityKey, connect, disconnect } = useWallet()
 
   const [docData, setDocData] = useState<GetDocumentResponse | null>(null)
   const [fields, setFields] = useState<SigningField[]>([])
@@ -74,6 +74,9 @@ export default function SignPage() {
   const document = docData?.document
   const mySigner = document?.signers.find((s) => params.token === s.token)
   const isMultisig = document?.isMultisig === true
+  
+  // Security check: is the connected wallet the expected signer?
+  const isCorrectWallet = !connected || !mySigner || identityKey === mySigner.identityKey
 
   // Count how many signers have already signed (for multisig status display)
   const signedCount = document?.signers.filter((s) => s.status === 'SIGNED').length ?? 0
@@ -334,8 +337,30 @@ export default function SignPage() {
             </div>
           )}
 
+          {/* Wrong wallet connected */}
+          {connected && mySigner && identityKey !== mySigner.identityKey && (
+            <div className="border border-red-200 bg-red-50 rounded-xl p-6 text-center space-y-3">
+              <p className="text-red-800 font-semibold">Wrong wallet connected</p>
+              <p className="text-red-700 text-sm">
+                This signing link is for a different identity. Please connect with the correct wallet to sign this document.
+              </p>
+              <p className="text-xs text-red-600 font-mono break-all">
+                Expected: {mySigner.identityKey.slice(0, 12)}...{mySigner.identityKey.slice(-8)}
+              </p>
+              <p className="text-xs text-red-600 font-mono break-all">
+                Connected: {identityKey?.slice(0, 12)}...{identityKey?.slice(-8)}
+              </p>
+              <button
+                onClick={disconnect}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
+              >
+                Disconnect Wallet
+              </button>
+            </div>
+          )}
+
           {/* Guided signing flow (if fields exist and not completed) */}
-          {connected && downloadUrl && fields.length > 0 && !guidedFlowCompleted && mySigner.status !== 'SIGNED' && (
+          {connected && isCorrectWallet && downloadUrl && fields.length > 0 && !guidedFlowCompleted && mySigner.status !== 'SIGNED' && (
             <GuidedSigningFlow
               pdfUrl={downloadUrl}
               fields={fields}
@@ -393,7 +418,7 @@ export default function SignPage() {
           )}
 
           {/* Sign buttons (only after guided flow is complete or no fields) */}
-          {connected && mySigner.status !== 'SIGNED' && document.status === 'PENDING' && downloadUrl && (fields.length === 0 || guidedFlowCompleted) && (
+          {connected && isCorrectWallet && mySigner.status !== 'SIGNED' && document.status === 'PENDING' && downloadUrl && (fields.length === 0 || guidedFlowCompleted) && (
             <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
               <p className="text-sm text-gray-600">
                 {isMultisig
