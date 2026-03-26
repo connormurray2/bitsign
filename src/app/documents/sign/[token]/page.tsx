@@ -340,8 +340,29 @@ export default function SignPage() {
               pdfUrl={downloadUrl}
               fields={fields}
               completedFields={allCompletedFields}
-              onComplete={(fieldValues) => {
+              onComplete={async (fieldValues) => {
                 setCompletedFieldValues(fieldValues)
+                
+                // Save field values immediately so they persist on reload
+                try {
+                  await fetch(`/api/sign/save-fields`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      token: params.token,
+                      fieldValues,
+                    }),
+                  })
+                  // Also update allCompletedFields so they show up
+                  const updatedFields = fieldValues.map(fv => {
+                    const originalField = fields.find(f => f.id === fv.fieldId)
+                    return originalField ? { ...originalField, value: fv.value } : null
+                  }).filter(Boolean) as SigningField[]
+                  setAllCompletedFields([...allCompletedFields, ...updatedFields])
+                } catch (e) {
+                  console.error('Failed to save field values:', e)
+                }
+                
                 setGuidedFlowCompleted(true)
               }}
               onCancel={() => setGuidedFlowCompleted(true)}
