@@ -270,10 +270,18 @@ export default function SignPage() {
       {partialDone && !broadcastTxid && !broadcasting && (
         <div className="p-4 bg-green-50 border border-green-300 rounded-xl text-sm space-y-1">
           <p className="font-semibold text-green-800">Your signature has been recorded.</p>
-          <p className="text-green-700">
-            Waiting for the remaining {totalSigners - signedCount - 1} signer(s) to sign.
-            The final transaction will be broadcast by the last signer.
-          </p>
+          {/* signedCount is from the initial fetch, before we signed. After signing, remaining = totalSigners - signedCount - 1 (us) */}
+          {totalSigners - signedCount - 1 > 0 ? (
+            <p className="text-green-700">
+              Waiting for the remaining {totalSigners - signedCount - 1} signer(s) to sign.
+              The final transaction will be broadcast by the last signer.
+            </p>
+          ) : (
+            <p className="text-green-700">
+              All signatures collected. The document should be broadcast shortly.
+              If you don&apos;t see a transaction ID, try refreshing the page.
+            </p>
+          )}
         </div>
       )}
 
