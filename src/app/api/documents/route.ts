@@ -57,14 +57,19 @@ export async function POST(req: NextRequest) {
     let verification: Awaited<ReturnType<typeof verifySigningTx>> | null = null
     if (!multisig && creatorSigningEvent) {
       // Single-sig flow: verify the creator's signing transaction on-chain
+      console.log('[POST /api/documents] Verifying TX:', creatorSigningEvent.txid)
       verification = await verifySigningTx(creatorSigningEvent.txid, creatorSigningEvent.rawTxHex)
+      console.log('[POST /api/documents] Verification result:', { valid: verification.valid, signatureValid: verification.signatureValid, error: verification.error, docHash: verification.docHash?.slice(0, 16) })
+      
       if (!verification.valid || !verification.signatureValid) {
+        console.error('[POST /api/documents] Verification failed:', verification.error)
         return NextResponse.json(
           { error: 'Creator signing transaction verification failed', detail: verification.error },
           { status: 422 }
         )
       }
       if (verification.docHash.toLowerCase() !== sha256.toLowerCase()) {
+        console.error('[POST /api/documents] Hash mismatch:', { expected: sha256, got: verification.docHash })
         return NextResponse.json(
           { error: 'Transaction document hash does not match provided sha256' },
           { status: 422 }
