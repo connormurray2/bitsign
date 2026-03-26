@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useWallet } from '@/hooks/useWallet'
 import { PDFViewer } from '@/components/documents/PDFViewer'
+import { PDFWithFields } from '@/components/documents/PDFWithFields'
 import { SignButton } from '@/components/signing/SignButton'
 import { GuidedSigningFlow } from '@/components/signing/GuidedSigningFlow'
 import type { BroadcastResult } from '@/lib/bsv/broadcast'
@@ -30,6 +31,7 @@ export default function SignPage() {
 
   const [docData, setDocData] = useState<GetDocumentResponse | null>(null)
   const [fields, setFields] = useState<SigningField[]>([])
+  const [allCompletedFields, setAllCompletedFields] = useState<SigningField[]>([]) // All completed fields from all signers
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [signError, setSignError] = useState('')
@@ -52,6 +54,7 @@ export default function SignPage() {
       .then((data) => {
         setDocData({ document: data.document })
         setFields(data.fields || [])
+        setAllCompletedFields(data.completedFields || [])
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -336,6 +339,7 @@ export default function SignPage() {
             <GuidedSigningFlow
               pdfUrl={downloadUrl}
               fields={fields}
+              completedFields={allCompletedFields}
               onComplete={(fieldValues) => {
                 setCompletedFieldValues(fieldValues)
                 setGuidedFlowCompleted(true)
@@ -344,9 +348,20 @@ export default function SignPage() {
             />
           )}
 
-          {/* PDF viewer (when no fields or guided flow completed) */}
+          {/* PDF viewer with completed fields (when no fields to complete or guided flow completed) */}
           {connected && downloadUrl && (fields.length === 0 || guidedFlowCompleted) && (
-            <PDFViewer url={downloadUrl} />
+            <PDFWithFields 
+              url={downloadUrl} 
+              fields={[
+                ...allCompletedFields,
+                // Add fields the user just completed (convert from value array to field format)
+                ...completedFieldValues.map(fv => {
+                  const originalField = fields.find(f => f.id === fv.fieldId)
+                  if (!originalField) return null
+                  return { ...originalField, value: fv.value }
+                }).filter(Boolean) as SigningField[]
+              ]} 
+            />
           )}
 
           {/* Loading state */}

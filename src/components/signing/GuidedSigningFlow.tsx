@@ -25,11 +25,12 @@ interface SigningField {
 interface GuidedSigningFlowProps {
   pdfUrl: string
   fields: SigningField[]
+  completedFields?: SigningField[] // Already completed fields from other signers
   onComplete: (fieldValues: { fieldId: string; value: string }[]) => void
   onCancel: () => void
 }
 
-export function GuidedSigningFlow({ pdfUrl, fields, onComplete, onCancel }: GuidedSigningFlowProps) {
+export function GuidedSigningFlow({ pdfUrl, fields, completedFields = [], onComplete, onCancel }: GuidedSigningFlowProps) {
   const [currentFieldIndex, setCurrentFieldIndex] = useState(0)
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
   const [showSignatureCanvas, setShowSignatureCanvas] = useState(false)
@@ -162,7 +163,41 @@ export function GuidedSigningFlow({ pdfUrl, fields, onComplete, onCancel }: Guid
                 renderTextLayer={true}
                 renderAnnotationLayer={true}
               />
-              {/* Render completed field values */}
+              {/* Render previously completed fields from other signers */}
+              {completedFields
+                .filter(f => f.page === currentPage && f.value)
+                .map(field => (
+                  <div
+                    key={`completed-${field.id}`}
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: `${field.x}%`,
+                      top: `${field.y}%`,
+                      width: `${field.width}%`,
+                      height: `${field.height}%`,
+                    }}
+                  >
+                    {(field.type === 'signature' || field.type === 'initials') && field.value?.startsWith('data:image') && (
+                      <img
+                        src={field.value}
+                        alt={field.type}
+                        className="w-full h-full object-contain"
+                      />
+                    )}
+                    {field.type === 'date' && field.value && (
+                      <div className="w-full h-full flex items-center text-xs font-medium text-gray-800 bg-white/80 px-1">
+                        {new Date(field.value).toLocaleDateString()}
+                      </div>
+                    )}
+                    {field.type === 'text' && field.value && (
+                      <div className="w-full h-full flex items-center text-xs font-medium text-gray-800 bg-white/80 px-1">
+                        {field.value}
+                      </div>
+                    )}
+                  </div>
+                ))
+              }
+              {/* Render current signer's completed field values */}
               {fields
                 .filter(f => f.page === currentPage && fieldValues[f.id])
                 .map(field => (

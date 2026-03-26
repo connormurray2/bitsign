@@ -27,18 +27,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 404 })
   }
 
-  // Filter fields to only include those assigned to this signer
-  const documentData = JSON.parse(JSON.stringify(signer.document))
-  const myFields = await prisma.signingField.findMany({
-    where: {
-      documentId: signer.document.id,
-      assignedSignerKey: signer.identityKey,
-    },
+  // Get all fields for this document
+  const allFields = await prisma.signingField.findMany({
+    where: { documentId: signer.document.id },
     orderBy: [{ page: 'asc' }, { y: 'asc' }, { x: 'asc' }],
   })
+
+  // Fields this signer needs to complete
+  const myFields = allFields.filter(f => f.assignedSignerKey === signer.identityKey && !f.value)
+  
+  // Completed fields from all signers (to show on PDF)
+  const completedFields = allFields.filter(f => f.value)
+
+  const documentData = JSON.parse(JSON.stringify(signer.document))
 
   return NextResponse.json({
     document: documentData,
     fields: JSON.parse(JSON.stringify(myFields)),
+    completedFields: JSON.parse(JSON.stringify(completedFields)),
   })
 }
