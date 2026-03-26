@@ -66,6 +66,7 @@ export async function POST(
             docHash: signer.document.sha256,
             ecdsaSig: s.partialSig!,
             rawTx: rawTxHex,
+            lockingScriptHex,
             timestamp,
           },
         })
