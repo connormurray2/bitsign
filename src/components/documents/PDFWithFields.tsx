@@ -54,60 +54,62 @@ export function PDFWithFields({ url, fields }: PDFWithFieldsProps) {
         }
       >
         {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
-          <div key={pageNum} className="relative mb-4 last:mb-0">
-            <Page
-              pageNumber={pageNum}
-              width={pageWidth}
-              renderTextLayer={true}
-              renderAnnotationLayer={true}
-              onLoadSuccess={(page) => {
-                // Adjust page width on first page load
-                if (pageNum === 1) {
-                  const container = document.querySelector('.pdf-fields-container')
-                  if (container) {
-                    setPageWidth(Math.min(600, container.clientWidth - 32))
+          <div key={pageNum} className="mb-4 last:mb-0">
+            <div className="relative inline-block">
+              <Page
+                pageNumber={pageNum}
+                width={pageWidth}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+                onLoadSuccess={(page) => {
+                  // Adjust page width on first page load
+                  if (pageNum === 1) {
+                    const container = document.querySelector('.pdf-fields-container')
+                    if (container) {
+                      setPageWidth(Math.min(600, container.clientWidth - 32))
+                    }
                   }
-                }
-              }}
-            />
-            
-            {/* Render completed fields as overlays */}
-            {fieldsByPage[pageNum]?.filter(f => f.value).map((field) => (
-              <div
-                key={field.id}
-                className="absolute pointer-events-none"
-                style={{
-                  left: `${field.x}%`,
-                  top: `${field.y}%`,
-                  width: `${field.width}%`,
-                  height: `${field.height}%`,
                 }}
-              >
-                {/* Signature/Initials: render the image */}
-                {(field.type === 'signature' || field.type === 'initials') && field.value?.startsWith('data:image') && (
-                  <img
-                    src={field.value}
-                    alt={field.type}
-                    className="w-full h-full object-contain"
-                    style={{ maxHeight: '100%' }}
-                  />
-                )}
-                
-                {/* Date: render formatted date */}
-                {field.type === 'date' && field.value && (
-                  <div className="w-full h-full flex items-center text-xs font-medium text-gray-800">
-                    {new Date(field.value).toLocaleDateString()}
-                  </div>
-                )}
-                
-                {/* Text: render the text value */}
-                {field.type === 'text' && field.value && (
-                  <div className="w-full h-full flex items-center text-xs font-medium text-gray-800">
-                    {field.value}
-                  </div>
-                )}
-              </div>
-            ))}
+              />
+              
+              {/* Render completed fields as overlays */}
+              {fieldsByPage[pageNum]?.filter(f => f.value).map((field) => (
+                <div
+                  key={field.id}
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${field.x}%`,
+                    top: `${field.y}%`,
+                    width: `${field.width}%`,
+                    height: `${field.height}%`,
+                  }}
+                >
+                  {/* Signature/Initials: render the image */}
+                  {(field.type === 'signature' || field.type === 'initials') && field.value?.startsWith('data:image') && (
+                    <img
+                      src={field.value}
+                      alt={field.type}
+                      className="w-full h-full object-contain"
+                      style={{ maxHeight: '100%' }}
+                    />
+                  )}
+                  
+                  {/* Date: render formatted date */}
+                  {field.type === 'date' && field.value && (
+                    <div className="w-full h-full flex items-center text-xs font-medium text-gray-800">
+                      {new Date(field.value).toLocaleDateString()}
+                    </div>
+                  )}
+                  
+                  {/* Text: render the text value */}
+                  {field.type === 'text' && field.value && (
+                    <div className="w-full h-full flex items-center text-xs font-medium text-gray-800">
+                      {field.value}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
             
             {/* Page number */}
             <div className="text-center text-xs text-gray-400 mt-2">
