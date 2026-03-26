@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useWallet } from '@/hooks/useWallet'
 import { useProfile } from '@/hooks/useProfile'
@@ -9,7 +9,7 @@ import { sha256DataUrl, broadcastIdentityRegistration } from '@/lib/bsv/identity
 
 type Step = 'name' | 'signature' | 'preview' | 'processing' | 'done'
 
-export default function OnboardingPage() {
+function OnboardingContent() {
   const { connected, identityKey, connect } = useWallet()
   const { hasProfile, mutate } = useProfile()
   const router = useRouter()
@@ -247,5 +247,13 @@ export default function OnboardingPage() {
         />
       )}
     </div>
+  )
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense>
+      <OnboardingContent />
+    </Suspense>
   )
 }
