@@ -9,6 +9,7 @@ import { signAndBroadcastDocument } from '@/lib/bsv/broadcast'
 import { MAX_FILE_SIZE_BYTES, SUPPORTED_MIME_TYPES } from '@/lib/utils/constants'
 import { BSV_EXPLORER_TX_URL } from '@/lib/utils/constants'
 import type { SigningField } from '@/components/documents/PdfFieldCanvas'
+import { SignatureCanvas } from '@/components/signing/SignatureCanvas'
 
 // Dynamically import PdfFieldCanvas to avoid SSR issues with PDF.js
 const PdfFieldCanvas = dynamic(() => import('@/components/documents/PdfFieldCanvas'), {
@@ -16,7 +17,7 @@ const PdfFieldCanvas = dynamic(() => import('@/components/documents/PdfFieldCanv
   loading: () => <div className="h-full flex items-center justify-center text-gray-500">Loading PDF viewer...</div>
 })
 
-type Step = 'upload' | 'signers' | 'fields' | 'sign' | 'done'
+type Step = 'upload' | 'signers' | 'fields' | 'complete-fields' | 'sign' | 'done'
 
 interface SignerInput {
   identityKey: string
@@ -50,6 +51,10 @@ export default function NewDocumentPage() {
   const [createdDocId, setCreatedDocId] = useState('')
   const [creatorTxid, setCreatorTxid] = useState('')
   const [fields, setFields] = useState<SigningField[]>([])
+  const [fieldValues, setFieldValues] = useState<Map<string, string>>(new Map())
+  const [currentFieldIndex, setCurrentFieldIndex] = useState(0)
+  const [showSignatureCanvas, setShowSignatureCanvas] = useState(false)
+  const [textInput, setTextInput] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -172,6 +177,7 @@ export default function NewDocumentPage() {
             width: f.width,
             height: f.height,
             assignedSignerKey: f.assignedSignerKey,
+            value: fieldValues.get(f.id),
           })),
         }
       } else {
@@ -192,6 +198,7 @@ export default function NewDocumentPage() {
             width: f.width,
             height: f.height,
             assignedSignerKey: f.assignedSignerKey,
+            value: fieldValues.get(f.id),
           })),
           creatorSigningEvent: {
             txid: broadcastResult.txid,
@@ -287,23 +294,39 @@ export default function NewDocumentPage() {
       <h1 className="text-2xl font-bold text-gray-900 mb-6">New Document</h1>
 
       {/* Progress steps */}
-      <div className="flex items-center gap-2 mb-8">
-        {(['upload', 'signers', 'fields', 'sign', 'done'] as Step[]).map((s, idx) => (
-          <div key={s} className="flex items-center gap-2">
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
-                ${step === s ? 'bg-blue-600 text-white' :
-                  ['upload', 'signers', 'fields', 'sign', 'done'].indexOf(step) > idx
-                    ? 'bg-green-500 text-white'
-                    : 'bg-gray-200 text-gray-500'}`}
-            >
-              {['upload', 'signers', 'fields', 'sign', 'done'].indexOf(step) > idx ? '✓' : idx + 1}
-            </div>
-            <span className="text-sm capitalize text-gray-600 hidden sm:block">{s}</span>
-            {idx < 4 && <div className="w-6 h-px bg-gray-300" />}
+      {(() => {
+        const steps: Step[] = ['upload', 'signers', 'fields', 'sign', 'done']
+        const stepLabels: Record<Step, string> = {
+          'upload': 'Upload',
+          'signers': 'Signers', 
+          'fields': 'Fields',
+          'complete-fields': 'Fill',
+          'sign': 'Sign',
+          'done': 'Done'
+        }
+        // Map complete-fields to same position as sign for progress display
+        const currentIdx = step === 'complete-fields' ? 3 : steps.indexOf(step)
+        
+        return (
+          <div className="flex items-center gap-2 mb-8">
+            {steps.map((s, idx) => (
+              <div key={s} className="flex items-center gap-2">
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
+                    ${(step === s || (step === 'complete-fields' && s === 'sign')) ? 'bg-blue-600 text-white' :
+                      currentIdx > idx
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gray-200 text-gray-500'}`}
+                >
+                  {currentIdx > idx ? '✓' : idx + 1}
+                </div>
+                <span className="text-sm text-gray-600 hidden sm:block">{stepLabels[s]}</span>
+                {idx < 4 && <div className="w-6 h-px bg-gray-300" />}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )
+      })()}
 
       {/* Step 1: Upload */}
       {step === 'upload' && (
@@ -492,7 +515,16 @@ export default function NewDocumentPage() {
               ← Back to Signers
             </button>
             <button
-              onClick={() => setStep('sign')}
+              onClick={() => {
+                // Check if creator has any fields to complete
+                const creatorFields = fields.filter(f => f.assignedSignerKey === identityKey)
+                if (creatorFields.length > 0) {
+                  setCurrentFieldIndex(0)
+                  setStep('complete-fields')
+                } else {
+                  setStep('sign')
+                }
+              }}
               className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
               Continue to Sign
@@ -501,7 +533,143 @@ export default function NewDocumentPage() {
         </div>
       )}
 
-      {/* Step 4: Sign */}
+      {/* Step 4a: Complete Creator Fields */}
+      {step === 'complete-fields' && identityKey && (() => {
+        const creatorFields = fields.filter(f => f.assignedSignerKey === identityKey)
+        const currentField = creatorFields[currentFieldIndex]
+        const currentValue = fieldValues.get(currentField?.id)
+        const isLastField = currentFieldIndex === creatorFields.length - 1
+        const allComplete = creatorFields.every(f => fieldValues.has(f.id))
+
+        const handleFieldComplete = (value: string) => {
+          setFieldValues(prev => new Map(prev).set(currentField.id, value))
+          setTextInput('')
+          setShowSignatureCanvas(false)
+          if (!isLastField) {
+            setCurrentFieldIndex(i => i + 1)
+          }
+        }
+
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-gray-800">Complete Your Fields</h2>
+              <span className="text-sm text-gray-500">
+                {currentFieldIndex + 1} of {creatorFields.length}
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${((currentFieldIndex + (currentValue ? 1 : 0)) / creatorFields.length) * 100}%` }}
+              />
+            </div>
+
+            {currentField && !currentValue && (
+              <div className="space-y-4">
+                <div className="text-sm font-medium text-gray-700">
+                  {currentField.type === 'signature' && '✍️ Signature Required'}
+                  {currentField.type === 'initials' && '🔤 Initials Required'}
+                  {currentField.type === 'date' && '📅 Date Required'}
+                  {currentField.type === 'text' && '📝 Text Input Required'}
+                </div>
+
+                {(currentField.type === 'signature' || currentField.type === 'initials') && (
+                  <button
+                    onClick={() => setShowSignatureCanvas(true)}
+                    className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+                  >
+                    {currentField.type === 'signature' ? 'Click to Sign' : 'Click to Add Initials'}
+                  </button>
+                )}
+
+                {currentField.type === 'date' && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600">Current date: {new Date().toLocaleDateString()}</p>
+                    <button
+                      onClick={() => handleFieldComplete(new Date().toISOString())}
+                      className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+                    >
+                      Confirm Date
+                    </button>
+                  </div>
+                )}
+
+                {currentField.type === 'text' && (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={textInput}
+                      onChange={(e) => setTextInput(e.target.value)}
+                      placeholder="Enter text..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      onKeyDown={(e) => e.key === 'Enter' && textInput.trim() && handleFieldComplete(textInput.trim())}
+                    />
+                    <button
+                      onClick={() => textInput.trim() && handleFieldComplete(textInput.trim())}
+                      disabled={!textInput.trim()}
+                      className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      Confirm
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {currentValue && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm flex items-center gap-2">
+                <span>✓</span>
+                <span>Field completed</span>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => {
+                  if (currentFieldIndex > 0) {
+                    setCurrentFieldIndex(i => i - 1)
+                  } else {
+                    setStep('fields')
+                  }
+                }}
+                className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200"
+              >
+                ← Back
+              </button>
+              {currentValue && !isLastField && (
+                <button
+                  onClick={() => setCurrentFieldIndex(i => i + 1)}
+                  className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+                >
+                  Next Field →
+                </button>
+              )}
+              {allComplete && (
+                <button
+                  onClick={() => setStep('sign')}
+                  className="flex-1 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
+                >
+                  Continue to Sign ✓
+                </button>
+              )}
+            </div>
+
+            {/* Signature Canvas Modal */}
+            {showSignatureCanvas && currentField && (
+              <SignatureCanvas
+                type={currentField.type as 'signature' | 'initials'}
+                onSave={(dataUrl) => handleFieldComplete(dataUrl)}
+                onCancel={() => setShowSignatureCanvas(false)}
+              />
+            )}
+          </div>
+        )
+      })()}
+
+      {/* Step 4b: Sign */}
       {step === 'sign' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <h2 className="font-semibold text-gray-800">Sign Document</h2>

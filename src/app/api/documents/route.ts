@@ -20,6 +20,7 @@ const fieldSchema = z.object({
   width: z.number().min(0).max(100),
   height: z.number().min(0).max(100),
   assignedSignerKey: z.string().min(66).max(130),
+  value: z.string().optional(), // Pre-filled value from creator
 })
 
 const schema = z.object({
@@ -96,6 +97,8 @@ export async function POST(req: NextRequest) {
               width: f.width,
               height: f.height,
               assignedSignerKey: f.assignedSignerKey,
+              value: f.value,
+              completedAt: f.value ? new Date() : null,
             })),
           } : undefined,
         },
