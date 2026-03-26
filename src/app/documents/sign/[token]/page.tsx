@@ -152,9 +152,15 @@ export default function SignPage() {
             document.title,
             allSigs
           )
-        } catch (broadcastErr) {
+        } catch (broadcastErr: any) {
           console.error('buildAndBroadcastMultisigDocument failed:', broadcastErr)
-          throw broadcastErr
+          setBroadcasting(false)
+          // Show user-friendly error message
+          const errMsg = broadcastErr?.message || broadcastErr?.toString() || 'Broadcast failed'
+          if (errMsg.toLowerCase().includes('insufficient') || errMsg.toLowerCase().includes('fund') || errMsg.toLowerCase().includes('balance') || errMsg.toLowerCase().includes('satoshi')) {
+            throw new Error('Insufficient wallet balance. Please add funds to your wallet and try again.')
+          }
+          throw new Error(`Broadcast failed: ${errMsg}`)
         }
 
         // Step 4: Record the broadcast on server
