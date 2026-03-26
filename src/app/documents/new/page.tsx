@@ -45,6 +45,9 @@ export default function NewDocumentPage() {
   const [newSignerHandle, setNewSignerHandle] = useState('')
   const [contacts, setContacts] = useState<Contact[]>([])
   const [contactSearch, setContactSearch] = useState('')
+  const [registeredSearch, setRegisteredSearch] = useState('')
+  const [registeredResults, setRegisteredResults] = useState<{ identityKey: string; firstName: string; lastName: string }[]>([])
+  const [registeredSearching, setRegisteredSearching] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [signingError, setSigningError] = useState('')
@@ -65,6 +68,23 @@ export default function NewDocumentPage() {
       .then((d) => setContacts(d.contacts ?? []))
       .catch(() => {})
   }, [connected, identityKey])
+
+  // Debounced registered user search
+  useEffect(() => {
+    if (!registeredSearch.trim() || registeredSearch.length < 2) {
+      setRegisteredResults([])
+      return
+    }
+    setRegisteredSearching(true)
+    const timer = setTimeout(() => {
+      fetch(`/api/profile/search?q=${encodeURIComponent(registeredSearch)}`)
+        .then((r) => r.json())
+        .then((d) => setRegisteredResults(d.results ?? []))
+        .catch(() => {})
+        .finally(() => setRegisteredSearching(false))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [registeredSearch])
 
   // Contacts filtered by search query, excluding already-added signers
   const filteredContacts = useMemo(() => {
@@ -382,6 +402,47 @@ export default function NewDocumentPage() {
               <button onClick={() => removeSigner(idx)} className="text-red-400 hover:text-red-600 text-sm px-2">✕</button>
             </div>
           ))}
+
+          {/* Registered user search */}
+          <div className="pt-2 border-t border-gray-100 space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Search Registered Users</p>
+            <div className="relative">
+              <input
+                type="text"
+                value={registeredSearch}
+                onChange={(e) => setRegisteredSearch(e.target.value)}
+                placeholder="Search by name..."
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+              />
+              {registeredSearching && (
+                <div className="absolute right-3 top-2.5 w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              )}
+            </div>
+            {registeredResults.length > 0 && (
+              <div className="rounded-lg border border-gray-200 divide-y divide-gray-100 max-h-48 overflow-y-auto">
+                {registeredResults
+                  .filter((r) => r.identityKey !== identityKey && !signers.some((s) => s.identityKey === r.identityKey))
+                  .map((r) => (
+                    <button
+                      key={r.identityKey}
+                      onClick={() => {
+                        const order = signers.length + 2
+                        setSigners((prev) => [...prev, { identityKey: r.identityKey, handle: `${r.firstName} ${r.lastName}`, order }])
+                        setRegisteredSearch('')
+                        setRegisteredResults([])
+                      }}
+                      className="w-full text-left px-3 py-2.5 hover:bg-blue-50 transition-colors"
+                    >
+                      <p className="text-sm font-medium text-gray-800">{r.firstName} {r.lastName}</p>
+                      <p className="text-xs font-mono text-gray-400 truncate">{r.identityKey.slice(0, 24)}...</p>
+                    </button>
+                  ))}
+              </div>
+            )}
+            {registeredSearch.length >= 2 && !registeredSearching && registeredResults.filter((r) => r.identityKey !== identityKey && !signers.some((s) => s.identityKey === r.identityKey)).length === 0 && (
+              <p className="text-xs text-gray-400 px-1">No registered users found</p>
+            )}
+          </div>
 
           {/* Contacts picker */}
           {contacts.length > 0 && (
