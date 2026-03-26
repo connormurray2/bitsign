@@ -116,19 +116,10 @@ export default function SignPage() {
         '@/lib/bsv/multisig'
       )
 
-      // Step 1: Create partial sig client-side (hash includes field values)
-      let hashToSign = document.sha256
-      if (completedFieldValues.length > 0) {
-        // Hash field values into the commitment using Web Crypto API
-        const fieldValuesString = JSON.stringify(completedFieldValues)
-        const encoder = new TextEncoder()
-        const data = encoder.encode(document.sha256 + fieldValuesString)
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-        const hashArray = Array.from(new Uint8Array(hashBuffer))
-        hashToSign = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-      }
-
-      const { sig, pubkey } = await createPartialSig(hashToSign)
+      // Step 1: Create partial sig client-side
+      // All signers must sign the same docHash for aggregation to work
+      // Field values are stored separately in the DB
+      const { sig, pubkey } = await createPartialSig(document.sha256)
 
       // Step 2: Submit to server
       const res = await fetch(`/api/documents/${document.id}/multisig`, {
