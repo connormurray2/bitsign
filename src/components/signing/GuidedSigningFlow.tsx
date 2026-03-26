@@ -163,8 +163,42 @@ export function GuidedSigningFlow({ pdfUrl, fields, onComplete, onCancel }: Guid
                 renderTextLayer={true}
                 renderAnnotationLayer={true}
               />
-              {/* Highlight current field */}
-              {currentField.page === currentPage && (
+              {/* Render completed field values */}
+              {fields
+                .filter(f => f.page === currentPage && fieldValues.has(f.id))
+                .map(field => (
+                  <div
+                    key={field.id}
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: `${field.x}%`,
+                      top: `${field.y}%`,
+                      width: `${field.width}%`,
+                      height: `${field.height}%`,
+                    }}
+                  >
+                    {(field.type === 'signature' || field.type === 'initials') && (
+                      <img
+                        src={fieldValues.get(field.id)}
+                        alt={field.type}
+                        className="w-full h-full object-contain"
+                      />
+                    )}
+                    {field.type === 'date' && (
+                      <div className="w-full h-full flex items-center text-xs font-medium text-gray-800 bg-white/80 px-1">
+                        {new Date(fieldValues.get(field.id)!).toLocaleDateString()}
+                      </div>
+                    )}
+                    {field.type === 'text' && (
+                      <div className="w-full h-full flex items-center text-xs font-medium text-gray-800 bg-white/80 px-1">
+                        {fieldValues.get(field.id)}
+                      </div>
+                    )}
+                  </div>
+                ))
+              }
+              {/* Highlight current field (if not yet completed) */}
+              {currentField.page === currentPage && !fieldValues.has(currentField.id) && (
                 <div style={getFieldStyle(currentField)} />
               )}
             </div>
