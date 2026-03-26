@@ -21,19 +21,10 @@ export function SignButton({ docHash, docTitle, onSuccess, onError, disabled, fi
     setSigning(true)
     setStep('Requesting signature from wallet...')
     try {
-      // If field values exist, hash them into the commitment
-      let hashToSign = docHash
-      if (fieldValues && fieldValues.length > 0) {
-        const fieldValuesString = JSON.stringify(fieldValues)
-        const encoder = new TextEncoder()
-        const data = encoder.encode(docHash + fieldValuesString)
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-        const hashArray = Array.from(new Uint8Array(hashBuffer))
-        hashToSign = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-      }
-
+      // Sign the original document hash
+      // Field values are stored in DB and linked to this signing event
       setStep('Signing document hash...')
-      const result = await signAndBroadcastDocument(hashToSign, docTitle)
+      const result = await signAndBroadcastDocument(docHash, docTitle)
       setStep('Broadcasting transaction...')
       onSuccess(result)
     } catch (err) {
