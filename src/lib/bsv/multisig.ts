@@ -53,6 +53,7 @@ export async function buildAndBroadcastMultisigDocument(
   docTitle: string,
   partialSigs: PartialSig[]
 ): Promise<MultisigBroadcastResult> {
+  console.log('[multisig broadcast] Starting broadcast for', docTitle, 'with', partialSigs.length, 'signers')
   const wallet = getWalletClient()
   const timestamp = new Date().toISOString()
 
@@ -85,6 +86,7 @@ export async function buildAndBroadcastMultisigDocument(
   )
 
   const lockingScriptHex = lockingScript.toHex()
+  console.log('[multisig broadcast] Locking script built, calling createAction...')
 
   const result = await wallet.createAction({
     description: `BitSign: ${docTitle} (${partialSigs.length} signers)`,
@@ -99,6 +101,8 @@ export async function buildAndBroadcastMultisigDocument(
     labels: ['bitsign', 'bitsign-multi'],
   })
 
+  console.log('[multisig broadcast] createAction returned:', { txid: result.txid, hasTx: !!result.tx })
+  
   if (!result.txid) throw new Error('Wallet did not return a txid')
 
   let rawTxHex: string | undefined
