@@ -6,6 +6,7 @@ import { useWallet } from '@/hooks/useWallet'
 import { useProfile } from '@/hooks/useProfile'
 import { SignatureCanvas } from '@/components/signing/SignatureCanvas'
 import { sha256DataUrl, broadcastIdentityRegistration } from '@/lib/bsv/identity'
+import { TxLink } from '@/components/blockchain/TxLink'
 
 type Step = 'edit' | 'preview' | 'processing' | 'done'
 
@@ -138,6 +139,18 @@ export default function ProfileEditPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Edit Profile</h1>
         <p className="text-sm text-gray-500 mt-1">Changes are anchored on-chain as a new identity registration.</p>
+      </div>
+
+      {/* Current on-chain registration */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
+        <h2 className="text-sm font-semibold text-gray-700">Identity Registration</h2>
+        <p className="text-xs text-gray-500">
+          Your identity is anchored on the BSV blockchain. Each update creates a new on-chain record.
+        </p>
+        <TxLink txid={profile.registrationTxid} variant="full" />
+        <p className="text-xs font-mono text-gray-400 break-all">
+          Commitment: {profile.commitmentHash}
+        </p>
       </div>
 
       {step === 'edit' && (
