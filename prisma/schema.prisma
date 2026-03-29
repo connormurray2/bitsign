@@ -17,6 +17,8 @@ model Document {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   expiresAt     DateTime?
+  folderId      String?
+  folder        Folder?       @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
   signers       Signer[]
   signingEvents SigningEvent[]
@@ -92,6 +94,17 @@ model SigningEvent {
   @@index([documentId])
   @@index([identityKey])
   @@index([txid])
+}
+
+model Folder {
+  id        String     @id @default(cuid())
+  ownerKey  String
+  name      String
+  createdAt DateTime   @default(now())
+
+  documents Document[]
+
+  @@index([ownerKey])
 }
 
 model SigningField {

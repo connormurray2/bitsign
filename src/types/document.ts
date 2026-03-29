@@ -50,6 +50,8 @@ export interface DocumentData {
   createdAt: string
   updatedAt: string
   expiresAt: string | null
+  folderId: string | null
+  folder: { id: string; name: string } | null
   signers: SignerData[]
   signingEvents: SigningEventData[]
   fields?: SigningFieldData[]

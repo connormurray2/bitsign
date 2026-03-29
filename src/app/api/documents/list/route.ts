@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
   const signerInclude = {
     signers: { orderBy: { order: 'asc' } as const, include: { signingEvent: true } },
     signingEvents: true,
+    folder: { select: { id: true, name: true } },
   }
 
   const [created, pendingSignature, signed] = await Promise.all([
